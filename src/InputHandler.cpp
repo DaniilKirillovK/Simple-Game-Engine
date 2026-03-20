@@ -82,6 +82,6 @@ bool InputHandler::isMouseButtonPressed(int button) const
 
 void InputHandler::clearFrameState()
 {
-    currentKeys.clear();
-    currentMouseButtons.clear();
+    //currentKeys.clear();
+    //currentMouseButtons.clear();
 }

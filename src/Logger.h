@@ -2,7 +2,7 @@
 #include <string>
 #include <fstream>
 
-constexpr int LOG_DETAILS_LEVEL = 4;
+constexpr int LOG_DETAILS_LEVEL = 3;
 
 #define LOG_INFO(msg) Logger::log(LogLevel::Info, msg)
 #define LOG_WARNING(msg) Logger::log(LogLevel::Warning, msg)

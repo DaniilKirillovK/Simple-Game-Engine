@@ -21,7 +21,13 @@ add_executable(${PROJECT_NAME}
     "src/InputHandler.cpp"
     "src/OpenGLRenderAdapter.cpp"
     ${GLAD_DIR}/src/glad.c
-)
+    "src/Entity.cpp" 
+    "src/Component.cpp" 
+    "src/ComponentPool.cpp" 
+    "src/World.cpp" 
+    "src/Systems/RenderSystem.cpp" 
+    "src/Systems/CameraSystem.cpp" 
+    "src/Systems/MovementSystem.cpp")
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}

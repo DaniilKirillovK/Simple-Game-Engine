@@ -3,6 +3,8 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <glm/glm.hpp>
+
 
 class OpenGLRenderAdapter : public IRenderAdapter
 {
@@ -36,16 +38,24 @@ private:
     virtual void onMouseMove(double x, double y) override;
     virtual void onMouseScroll(double xoffset, double yoffset) override;
 
+    virtual void setModelMatrix(const float* matrix) override;
+    virtual void setViewMatrix(const float* matrix) override;
+    virtual void setProjectionMatrix(const float* matrix) override;
+    virtual void setNormalMatrix(const float* matrix) override;
+    virtual float getAspectRatio() override;
+    virtual void setMaterial(const Material* material) override;
+    virtual void setLights(const std::vector<Light*>& lights) override;
+    virtual void drawMesh(const Mesh* mesh) override;
+
     bool initGLFW(int width, int height);
     bool initGLAD();
     void setupOpenGLState();
 
     void onFramebufferResize(int width, int height);
+    
+    void updateProjectionMatrix();
 
-    void setupSquare();
-    void drawSquare();
-
-    void updateProjection();
+    void createMeshVAO(Mesh* mesh);
 
     // Key Events
     std::vector<KeyEvent> keyEvents;
@@ -53,15 +63,45 @@ private:
     std::vector<MouseMoveEvent> mouseMoveEvents;
     std::vector<MouseScrollEvent> mouseScrollEvents;
 
-    // Projection
-    unsigned int m_projectionLoc;
-    float m_aspectRatio;
+    glm::mat4 currentModelMatrix = glm::mat4(1.0f);
+    glm::mat4 currentViewMatrix = glm::mat4(1.0f);
+    glm::mat4 currentProjectionMatrix = glm::mat4(1.0f);
+    glm::mat4 currentNormalMatrix = glm::mat4(1.0f);
+
+    const Material* currentMaterial = nullptr;
+    std::vector<Light*> currentLights;
 
     // Shaders & buffers
     unsigned int m_shaderProgram;
-    unsigned int m_VAO;
-    unsigned int m_VBO;
-    unsigned int m_EBO;
+    struct UniformLocations 
+    {
+        GLint modelMatrix = -1;
+        GLint viewMatrix = -1;
+        GLint projectionMatrix = -1;
+        GLint normalMatrix = -1;
+
+        // Material
+        GLint materialDiffuseColor = -1;
+        GLint materialSpecularColor = -1;
+        GLint materialAmbientColor = -1;
+        GLint materialShininess = -1;
+        GLint materialHasTexture = -1;
+
+        GLint numLights = -1;
+        GLint lightTypes[8] = { -1 };
+        GLint lightColors[8] = { -1 };
+        GLint lightIntensities[8] = { -1 };
+        GLint lightPositions[8] = { -1 };
+        GLint lightDirections[8] = { -1 };
+        GLint lightConstants[8] = { -1 };
+        GLint lightLinears[8] = { -1 };
+        GLint lightQuadratics[8] = { -1 };
+        GLint lightCutOffs[8] = { -1 };
+        GLint lightOuterCutOffs[8] = { -1 };
+    } uniforms;
+    std::unordered_map<Mesh*, GLuint> meshVAOs;
+    std::unordered_map<Mesh*, GLuint> meshVBOs;
+    std::unordered_map<Mesh*, GLuint> meshEBOs;
 
     GLFWwindow* m_window;
     int m_width;

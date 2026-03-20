@@ -7,6 +7,7 @@
 #include "IGameState.h"
 #include "InputHandler.h"
 #include "IRenderAdapter.h"
+#include "World.h"
 
 class Application
 {
@@ -22,6 +23,10 @@ private:
     void update(float deltaTime);
     void render();
     void changeState(std::unique_ptr<IGameState> newState);
+
+    void setupTestScene();
+
+    World world;
 
     std::unique_ptr<IRenderAdapter> renderer;
     std::unique_ptr<IGameState> currentState;
