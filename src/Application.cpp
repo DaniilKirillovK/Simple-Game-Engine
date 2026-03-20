@@ -56,10 +56,34 @@ void Application::shutdown()
 
 void Application::handleEvents()
 {
+    renderer->pollEvents();
+
+    auto keyEvents = renderer->getKeyEvents();
+    auto mouseButtonEvents = renderer->getMouseButtonEvents();
+    auto mouseMoveEvents = renderer->getMouseMoveEvents();
+    auto mouseScrollEvents = renderer->getMouseScrollEvents();
+
+    input.processKeyEvents(keyEvents);
+    input.processMouseButtonEvents(mouseButtonEvents);
+    input.processMouseMoveEvents(mouseMoveEvents);
+    input.processMouseScrollEvents(mouseScrollEvents);
 }
 
 void Application::update(float deltaTime)
 {
+    input.update();
+
+    if (currentState) 
+    {
+        currentState->update(deltaTime, input);
+        if (currentState->isFinished()) 
+        {
+            auto next = currentState->getNextState();
+            if (next) changeState(std::move(next));
+        }
+    }
+
+    input.clearFrameState();
 }
 
 void Application::render()
@@ -69,5 +93,9 @@ void Application::render()
 
 void Application::changeState(std::unique_ptr<IGameState> newState)
 {
+    if (currentState) currentState->onExit();
+    currentState = std::move(newState);
+    if (currentState) currentState->onEnter();
+
     LOG_INFO("Game state changed");
 }

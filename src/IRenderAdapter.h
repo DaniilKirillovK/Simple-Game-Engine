@@ -1,12 +1,7 @@
 #pragma once
 #include <string>
 #include <cstdint>
-
-struct Color 
-{
-    uint8_t r, g, b, a;
-    Color(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0, uint8_t a = 255) : r(r), g(g), b(b), a(a) {}
-};
+#include "InputHandler.h"
 
 class IRenderAdapter 
 {
@@ -18,7 +13,15 @@ public:
     virtual bool shouldClose() const = 0;
     virtual void compileShaders() = 0;
     virtual bool checkShaderCompileErrors(unsigned int shader, const std::string& type) = 0;
+    virtual void pollEvents() = 0;
 
-    static constexpr unsigned int DEFAULT_WIDTH = 800;
-    static constexpr unsigned int DEFAULT_HEIGHT = 600;
+    virtual void onKey(int key, int action) = 0;
+    virtual void onMouseButton(int button, int action) = 0;
+    virtual void onMouseMove(double x, double y) = 0;
+    virtual void onMouseScroll(double xoffset, double yoffset) = 0;
+
+    virtual std::vector<KeyEvent> getKeyEvents() = 0;
+    virtual std::vector<MouseButtonEvent> getMouseButtonEvents() = 0;
+    virtual std::vector<MouseMoveEvent> getMouseMoveEvents() = 0;
+    virtual std::vector<MouseScrollEvent> getMouseScrollEvents() = 0;
 };

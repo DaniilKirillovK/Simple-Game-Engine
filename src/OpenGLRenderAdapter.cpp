@@ -88,7 +88,6 @@ void OpenGLRenderAdapter::render()
     drawSquare();
 
     glfwSwapBuffers(m_window);
-    glfwPollEvents();
 }
 
 void OpenGLRenderAdapter::shutdown()
@@ -121,6 +120,61 @@ void OpenGLRenderAdapter::framebufferSizeCallback(GLFWwindow* window, int width,
     }
 }
 
+void OpenGLRenderAdapter::onKey(int key, int action)
+{
+    KeyEvent event;
+    event.keyCode = key;
+
+    if (action == GLFW_PRESS) 
+    {
+        event.pressed = true;
+    }
+    else if (action == GLFW_RELEASE) 
+    {
+        event.pressed = false;
+    }
+    else 
+    {
+        return;
+    }
+
+    keyEvents.push_back(event);
+}
+
+void OpenGLRenderAdapter::onMouseButton(int button, int action)
+{
+    MouseButtonEvent event;
+    event.button = button;
+
+    if (action == GLFW_PRESS) 
+    {
+        event.pressed = true;
+    }
+    else 
+    {
+        event.pressed = false;
+    }
+
+    mouseButtonEvents.push_back(event);
+}
+
+void OpenGLRenderAdapter::onMouseMove(double x, double y)
+{
+    MouseMoveEvent event;
+    event.x = x;
+    event.y = y;
+    mouseMoveEvents.push_back(event);
+}
+
+void OpenGLRenderAdapter::onMouseScroll(double xoffset, double yoffset)
+{
+    MouseScrollEvent event;
+    event.xOffset = xoffset;
+    event.yOffset = yoffset;
+    mouseScrollEvents.push_back(event);
+}
+
+
 bool OpenGLRenderAdapter::initGLFW(int width, int height)
 {
     if (!glfwInit()) 
@@ -139,6 +193,12 @@ bool OpenGLRenderAdapter::initGLFW(int width, int height)
     }
 
     glfwMakeContextCurrent(m_window);
+
+    glfwSetKeyCallback(m_window, keyCallback);
+    glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
+    glfwSetCursorPosCallback(m_window, cursorPosCallback);
+    glfwSetScrollCallback(m_window, scrollCallback);
+
     glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
 
     return true;
@@ -292,4 +352,46 @@ bool OpenGLRenderAdapter::checkShaderCompileErrors(unsigned int shader, const st
         }
     }
     return true;
+}
+
+void OpenGLRenderAdapter::pollEvents()
+{
+    keyEvents.clear();
+    mouseButtonEvents.clear();
+    mouseMoveEvents.clear();
+    mouseScrollEvents.clear();
+
+    glfwPollEvents();
+}
+
+void OpenGLRenderAdapter::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (g_instance) 
+    {
+        g_instance->onKey(key, action);
+    }
+}
+
+void OpenGLRenderAdapter::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (g_instance)
+    {
+        g_instance->onMouseButton(button, action);
+    }
+}
+
+void OpenGLRenderAdapter::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (g_instance) 
+    {
+        g_instance->onMouseMove(xpos, ypos);
+    }
+}
+
+void OpenGLRenderAdapter::scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    if (g_instance)
+    {
+        g_instance->onMouseScroll(xoffset, yoffset);
+    }
 }

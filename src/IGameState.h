@@ -12,7 +12,6 @@ public:
     virtual void onEnter() {}
     virtual void onExit() {}
     virtual void update(float deltaTime, InputHandler& input) = 0;
-    virtual void render(IRenderAdapter& renderer) = 0;
     virtual bool isFinished() const { return false; }
     virtual std::unique_ptr<IGameState> getNextState() { return nullptr; }
 };

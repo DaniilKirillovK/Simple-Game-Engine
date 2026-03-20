@@ -2,8 +2,11 @@
 #include <chrono>
 #include <iostream>
 #include <fstream>
+#include <mutex>
+#include <thread>
 
 std::ofstream Logger::fileStream;
+std::mutex mtx;
 
 Logger& Logger::instance()
 {
@@ -15,6 +18,8 @@ void Logger::log(LogLevel level, const std::string& message, int detailsLevel)
 {
     if (LOG_DETAILS_LEVEL >= detailsLevel)
     {
+        mtx.lock();
+
         std::string levelStr;
         switch (level)
         {
@@ -40,6 +45,8 @@ void Logger::log(LogLevel level, const std::string& message, int detailsLevel)
         {
             fileStream << formatted << std::endl;
         }
+
+        mtx.unlock();
     }
 }
 
@@ -50,7 +57,7 @@ void Logger::setLogFile(const std::string& filename)
         fileStream.close();
     }
 
-    fileStream.open(filename, std::ios::out | std::ios::app);
+    fileStream.open(filename, std::ios::out | std::ios::trunc);
 
     if (fileStream.is_open()) 
     {

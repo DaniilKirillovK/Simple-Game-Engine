@@ -10,6 +10,3 @@ void GameplayState::update(float deltaTime, InputHandler& input)
 {
 }
 
-void GameplayState::render(IRenderAdapter& renderer)
-{
-}
