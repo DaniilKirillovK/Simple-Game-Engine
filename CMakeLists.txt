@@ -13,21 +13,7 @@ list(APPEND SOURCES ${GLAD_DIR}/src/glad.c)
 set(GLFW_LIB_DIR "${GLFW_DIR}/lib-vc2022")
 set(GLFW_LIB_NAME "glfw3")
 
-add_executable(${PROJECT_NAME}
-    "GameEngine.cpp"
-    "src/Application.cpp"
-    "src/Logger.cpp"
-    "src/GameplayState.cpp"
-    "src/InputHandler.cpp"
-    "src/OpenGLRenderAdapter.cpp"
-    ${GLAD_DIR}/src/glad.c
-    "src/Entity.cpp" 
-    "src/Component.cpp" 
-    "src/ComponentPool.cpp" 
-    "src/World.cpp" 
-    "src/Systems/RenderSystem.cpp" 
-    "src/Systems/CameraSystem.cpp" 
-    "src/Systems/MovementSystem.cpp")
+add_executable(${PROJECT_NAME} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp")
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}

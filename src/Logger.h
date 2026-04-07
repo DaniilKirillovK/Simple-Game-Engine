@@ -8,8 +8,9 @@ constexpr int LOG_DETAILS_LEVEL = 3;
 #define LOG_WARNING(msg) Logger::log(LogLevel::Warning, msg)
 #define LOG_ERROR(msg) Logger::log(LogLevel::Error, msg)
 #define LOG_INPUT(msg) Logger::log(LogLevel::Info, msg, 4);
+#define LOG_RESOURCEMANAGER(msg) Logger::log(LogLevel::ResourceManager, msg, 3);
 
-enum class LogLevel { Info, Warning, Error };
+enum class LogLevel { Info, Warning, Error, ResourceManager };
 
 class Logger 
 {

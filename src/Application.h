@@ -24,10 +24,6 @@ private:
     void render();
     void changeState(std::unique_ptr<IGameState> newState);
 
-    void setupTestScene();
-
-    World world;
-
     std::unique_ptr<IRenderAdapter> renderer;
     std::unique_ptr<IGameState> currentState;
     InputHandler input;
