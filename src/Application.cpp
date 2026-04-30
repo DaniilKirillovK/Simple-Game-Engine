@@ -4,6 +4,7 @@
 #include "GameplayState.h"
 #include "OpenGLRenderAdapter.h"
 #include "Resources/ResourceManager.h"
+#include "Loaders/MeshLoader.h"
 
 Application::Application()
 {
@@ -16,6 +17,8 @@ Application::~Application()
 bool Application::initialize(int width, int height, const std::string& title)
 {
     LOG_INFO("Initializing application...");
+
+    MeshLoader::RegisterLoader();
 
     renderer = std::make_unique<OpenGLRenderAdapter>();
     if (!renderer->initialize(width, height)) 

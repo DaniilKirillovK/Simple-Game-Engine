@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "MeshFactory.h"
+#include "Resources/ResourceManager.h"
 
 #include "Components/Material.h"
 #include "Components/Tag.h"
@@ -50,6 +51,7 @@ void GameplayState::setupTestScene()
     Material* blueMaterial = new Material{ glm::vec4(0.2f, 0.2f, 1.0f, 1.0f) };
     Material* yellowMaterial = new Material{ glm::vec4(1.0f, 1.0f, 0.2f, 1.0f) };
     Material* grayMaterial = new Material{ glm::vec4(0.5f, 0.5f, 0.5f, 1.0f) };
+    Material* purpleMaterial = new Material{ glm::vec4(0.6f, 0.2f, 0.8f, 1.0f) };
 
     EntityId redCube = world.createEntity();
     world.addComponent<Transform>(redCube, Transform{
@@ -80,6 +82,27 @@ void GameplayState::setupTestScene()
         });
     world.addComponent<MeshRenderer>(yellowCube, MeshRenderer{ cubeMesh, yellowMaterial });
     world.addComponent<Tag>(yellowCube, Tag{ "Static" });
+
+    // Loaded model with RESOURCE_MANAGER
+    auto meshResource = RESOURCE_MANAGER.load<Mesh>("../../../assets/Skull.obj"); // Skull.obj - multi, teamugobj.obj - single
+    if (meshResource && meshResource->isValid())
+    {
+        LOG_INFO("Successfully loaded mesh from file, adding to scene");
+        Mesh* loadedMesh = meshResource->get();
+        EntityId loadedEntity = world.createEntity();
+        world.addComponent<Transform>(loadedEntity, Transform{
+            glm::vec3(0.0f, 2.0f, 0.0f),
+            glm::quat(0.707f, -0.707f, 0.0f, 0.0f),
+            glm::vec3(0.5f, 0.5f, 0.5f),
+            glm::vec3(0.0f, 0.0f, 0.0f)
+            });
+        world.addComponent<MeshRenderer>(loadedEntity, MeshRenderer{ loadedMesh, purpleMaterial });
+        world.addComponent<Tag>(loadedEntity, Tag{ "LoadedFromFile" });
+    }
+    else
+    {
+        LOG_WARNING("Failed to load mesh from file");
+    }
 
     EntityId camera = world.createEntity();
     world.addComponent<Transform>(camera, Transform{
