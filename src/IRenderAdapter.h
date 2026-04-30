@@ -15,6 +15,12 @@ struct Color
     }
 };
 
+enum class ShaderType
+{
+    Vertex,
+    Fragment
+};
+
 class IRenderAdapter
 {
 public:
@@ -49,4 +55,10 @@ public:
     virtual void setLights(const std::vector<Light*>& lights) = 0;
 
     virtual void drawMesh(const Mesh* mesh) = 0;
+
+    // Shader compile and linkage
+    virtual unsigned int compileShaderSource(const std::string& source, ShaderType type) = 0;
+    virtual unsigned int linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader) = 0;
+    virtual void deleteShaderObject(unsigned int shader) = 0;
+    virtual void deleteShaderProgram(unsigned int program) = 0;
 };

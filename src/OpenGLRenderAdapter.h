@@ -6,6 +6,8 @@
 #include <glm/glm.hpp>
 
 
+struct ShaderProgram;
+
 class OpenGLRenderAdapter : public IRenderAdapter
 {
 public:
@@ -24,6 +26,11 @@ public:
     virtual std::vector<MouseButtonEvent> getMouseButtonEvents() override { return mouseButtonEvents; }
     virtual std::vector<MouseMoveEvent> getMouseMoveEvents() override { return mouseMoveEvents; }
     virtual std::vector<MouseScrollEvent> getMouseScrollEvents() override { return mouseScrollEvents; }
+
+    virtual unsigned int compileShaderSource(const std::string& source, ShaderType type) override;
+    virtual unsigned int linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader) override;
+    virtual void deleteShaderObject(unsigned int shader) override;
+    virtual void deleteShaderProgram(unsigned int program) override;
 
 private:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -71,7 +78,8 @@ private:
     const Material* currentMaterial = nullptr;
     std::vector<Light*> currentLights;
 
-    // Shaders & buffers
+    // ShaderLoader & buffers
+    std::shared_ptr<ShaderProgram> m_testShader;
     unsigned int m_shaderProgram;
     struct UniformLocations 
     {
@@ -109,4 +117,6 @@ private:
 
     static constexpr unsigned int DEFAULT_WIDTH = 800;
     static constexpr unsigned int DEFAULT_HEIGHT = 600;
+
+    void CompileTestShaders();
 };
