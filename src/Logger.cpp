@@ -35,6 +35,9 @@ void Logger::log(LogLevel level, const std::string& message, int detailsLevel)
         case LogLevel::ResourceManager:
             levelStr = "RESOURCEMANAGER";
             break;
+        case LogLevel::ResourceManagerError:
+            levelStr = "RESOURCEMANAGER ERROR";
+            break;
         }
         auto now = std::chrono::system_clock::now();
         std::time_t t = std::chrono::system_clock::to_time_t(now);

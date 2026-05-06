@@ -16,7 +16,7 @@ struct MouseButtonEvent
 
 struct MouseMoveEvent
 {
-    int x, y;
+    double x, y;
 };
 
 struct MouseScrollEvent 

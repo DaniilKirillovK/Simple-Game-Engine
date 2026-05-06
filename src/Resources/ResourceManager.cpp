@@ -6,9 +6,6 @@
 
 void ResourceManager::unloadAllResources()
 {
-    std::lock_guard<std::mutex> lock(mutex);
-
     caches.clear();
-
     LOG_RESOURCEMANAGER("All resources unloaded");
 }

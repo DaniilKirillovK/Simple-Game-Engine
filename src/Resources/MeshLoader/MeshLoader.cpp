@@ -1,4 +1,4 @@
-#include "Loaders/MeshLoader.h"
+#include "Resources/MeshLoader/MeshLoader.h"
 #include "Logger.h"
 #include "Resources/ResourceManager.h"
 
@@ -9,7 +9,7 @@
 #include <glm/glm.hpp>
 #include <stdexcept>
 
-std::unique_ptr<Mesh> MeshLoader::LoadModel(const std::string& filepath) 
+std::unique_ptr<Mesh> MeshLoader::loadModel(const std::string& filepath)
 {
     Assimp::Importer importer;
 
@@ -19,10 +19,10 @@ std::unique_ptr<Mesh> MeshLoader::LoadModel(const std::string& filepath)
              " (meshes: " + std::to_string(scene->mNumMeshes) + 
              ", materials: " + std::to_string(scene->mNumMaterials) + ")");
 
-    return LoadModelInner(scene);
+    return loadModelInner(scene);
 }
 
-std::vector<std::unique_ptr<Mesh>> MeshLoader::LoadAllMeshes(const std::string& filepath) 
+std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshes(const std::string& filepath)
 {
     Assimp::Importer importer;
 
@@ -31,16 +31,16 @@ std::vector<std::unique_ptr<Mesh>> MeshLoader::LoadAllMeshes(const std::string& 
     LOG_INFO(std::string("Loading all meshes: ") + filepath + 
              " (meshes: " + std::to_string(scene->mNumMeshes) + ")");
 
-    return LoadAllMeshesInner(scene);
+    return loadAllMeshesInner(scene);
 }
 
 
-std::unique_ptr<Mesh> MeshLoader::LoadModelInner(const aiScene* scene)
+std::unique_ptr<Mesh> MeshLoader::loadModelInner(const aiScene* scene)
 {
-    return ProcessMesh(scene->mMeshes[0]);
+    return processMesh(scene->mMeshes[0]);
 }
 
-std::vector<std::unique_ptr<Mesh>> MeshLoader::LoadAllMeshesInner(const aiScene* scene)
+std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshesInner(const aiScene* scene)
 {
     std::vector<std::unique_ptr<Mesh>> meshes;
     
@@ -48,7 +48,7 @@ std::vector<std::unique_ptr<Mesh>> MeshLoader::LoadAllMeshesInner(const aiScene*
 
     for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
     {
-        meshes.push_back(ProcessMesh(scene->mMeshes[i]));
+        meshes.push_back(processMesh(scene->mMeshes[i]));
     }
 
     LOG_INFO(std::string("Loaded ") + std::to_string(meshes.size()) + " meshes from scene");
@@ -56,7 +56,7 @@ std::vector<std::unique_ptr<Mesh>> MeshLoader::LoadAllMeshesInner(const aiScene*
     return meshes;
 }
 
-std::unique_ptr<Mesh> MeshLoader::ProcessMesh(struct aiMesh* mesh) 
+std::unique_ptr<Mesh> MeshLoader::processMesh(struct aiMesh* mesh)
 {
     auto result = std::make_unique<Mesh>();
     result->type = MeshType::Custom;
@@ -137,13 +137,13 @@ std::unique_ptr<Mesh> MeshLoader::ProcessMesh(struct aiMesh* mesh)
     return result;
 }
 
-std::string MeshLoader::ExtractDirectory(const std::string& filepath) 
+std::string MeshLoader::extractDirectory(const std::string& filepath) 
 {
     size_t lastSlash = filepath.find_last_of("/\\");
     return (lastSlash != std::string::npos) ? filepath.substr(0, lastSlash) : "";
 }
 
-std::unique_ptr<Mesh> MeshLoader::Load(const std::string& filepath)
+std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
 {
     Assimp::Importer importer;
 
@@ -165,12 +165,12 @@ std::unique_ptr<Mesh> MeshLoader::Load(const std::string& filepath)
     else if (meshCount == 1)
     {
         LOG_INFO(std::string("Single mesh detected, using LoadModelInternal: ") + filepath);
-        return LoadModelInner(scene);  // 
+        return loadModelInner(scene);  // 
     }
     else
     {
         LOG_INFO(std::string("Multiple meshes detected (") + std::to_string(meshCount) + "), using LoadAllMeshesInternal: " + filepath);
-        auto meshes = LoadAllMeshesInner(scene);  // 
+        auto meshes = loadAllMeshesInner(scene);  // 
         
         if (meshes.empty())
         {
@@ -210,8 +210,8 @@ std::unique_ptr<Mesh> MeshLoader::Load(const std::string& filepath)
     }
 }
 
-void MeshLoader::RegisterLoader()
+void MeshLoader::registerLoader()
 {
-    RESOURCE_MANAGER.registerLoader<Mesh>(&MeshLoader::Load, 0);
+    RESOURCE_MANAGER.registerLoader<Mesh>(&meshLoad, 0);
     LOG_INFO("MeshLoader registered with ResourceManager");
 }

@@ -12,8 +12,11 @@ uniform vec4 uMaterialAmbientColor;
 uniform float uMaterialShininess;
 uniform int uMaterialHasTexture;
 
+uniform sampler2D uTexture;
+
 // Light
-struct Light {
+struct Light 
+{
     int type;      // 0-directional, 1-point, 2-spot
     vec3 color;
     float intensity;
@@ -32,14 +35,23 @@ uniform Light uLights[8];
 // Camera
 uniform vec3 uCameraPosition;
 
-void main() {
+void main() 
+{
     vec3 normal = normalize(vNormal);
     vec3 viewDir = normalize(uCameraPosition - vWorldPosition);
 
-    vec3 result = vec3(0.0);
-
-    vec3 globalAmbient = vec3(0.2);
-    result += globalAmbient * uMaterialDiffuseColor.rgb;
+    vec3 globalAmbient = vec3(0.2f);
+    vec3 result = vec3(0.0f);
+    
+    if (uMaterialHasTexture == 1)
+    {
+        vec4 texColor = texture(uTexture, vTexCoord);
+        result = texColor.rgb; 
+    }
+    else
+    {
+        result = uMaterialDiffuseColor.rgb * globalAmbient;
+    }
 
     for (int i = 0; i < uNumLights; i++)
     {
@@ -48,16 +60,19 @@ void main() {
         vec3 lightDir;
         float attenuation = 1.0;
 
-        if (light.type == 0) { // Directional light
+        if (light.type == 0) 
+        { // Directional light
             lightDir = normalize(-light.direction);
         }
-        else if (light.type == 1) { // Point light
+        else if (light.type == 1) 
+        { // Point light
             vec3 lightVec = light.position - vWorldPosition;
             float distance = length(lightVec);
             lightDir = normalize(lightVec);
             attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * distance * distance);
         }
-        else { // Spot light
+        else 
+        { // Spot light
             vec3 lightVec = light.position - vWorldPosition;
             float distance = length(lightVec);
             lightDir = normalize(lightVec);
@@ -69,9 +84,6 @@ void main() {
             attenuation = intensity / (light.constant + light.linear * distance + light.quadratic * distance * distance);
         }
 
-        // Ambient
-        vec3 ambient = light.color * light.intensity * uMaterialAmbientColor.rgb;
-
         // Diffuse
         float diff = max(dot(normal, lightDir), 0.0);
         vec3 diffuse = light.color * light.intensity * diff * uMaterialDiffuseColor.rgb;
@@ -81,7 +93,7 @@ void main() {
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
         vec3 specular = light.color * light.intensity * spec * uMaterialSpecularColor.rgb;
 
-        result += (ambient + diffuse + specular) * attenuation;
+        result += (diffuse + specular) * attenuation;
     }
 
     FragColor = vec4(result, uMaterialDiffuseColor.a);

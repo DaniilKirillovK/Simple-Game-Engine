@@ -42,16 +42,20 @@ void GameplayState::render()
 
 void GameplayState::setupTestScene()
 {
+    // Loaded shaders with RESOURCE_MANAGER
+    auto vertShaderResource = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
+    auto fragShaderResource = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
+
     Mesh* cubeMesh = MeshFactory::createCube();
     Mesh* sphereMesh = MeshFactory::createSphere(0.5f, 36, 18);
     Mesh* planeMesh = MeshFactory::createPlane(10.0f);
 
-    Material* redMaterial = new Material{ glm::vec4(1.0f, 0.2f, 0.2f, 1.0f) };
-    Material* greenMaterial = new Material{ glm::vec4(0.2f, 1.0f, 0.2f, 1.0f) };
-    Material* blueMaterial = new Material{ glm::vec4(0.2f, 0.2f, 1.0f, 1.0f) };
-    Material* yellowMaterial = new Material{ glm::vec4(1.0f, 1.0f, 0.2f, 1.0f) };
-    Material* grayMaterial = new Material{ glm::vec4(0.5f, 0.5f, 0.5f, 1.0f) };
-    Material* purpleMaterial = new Material{ glm::vec4(0.6f, 0.2f, 0.8f, 1.0f) };
+    Material* redMaterial = new Material{ glm::vec4(1.0f, 0.2f, 0.2f, 1.0f), vertShaderResource->get(), fragShaderResource->get(), renderer};
+    Material* greenMaterial = new Material{ glm::vec4(0.2f, 1.0f, 0.2f, 1.0f), vertShaderResource->get(), fragShaderResource->get(), renderer };
+    Material* blueMaterial = new Material{ glm::vec4(0.2f, 0.2f, 1.0f, 1.0f), vertShaderResource->get(), fragShaderResource->get(), renderer };
+    Material* yellowMaterial = new Material{ glm::vec4(1.0f, 1.0f, 0.2f, 1.0f), vertShaderResource->get(), fragShaderResource->get(), renderer };
+    Material* grayMaterial = new Material{ glm::vec4(0.5f, 0.5f, 0.5f, 1.0f), vertShaderResource->get(), fragShaderResource->get(), renderer };
+    Material* purpleMaterial = new Material{ glm::vec4(0.6f, 0.2f, 0.8f, 1.0f), vertShaderResource->get(), fragShaderResource->get(), renderer };
 
     EntityId redCube = world.createEntity();
     world.addComponent<Transform>(redCube, Transform{
@@ -60,7 +64,7 @@ void GameplayState::setupTestScene()
         glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 45.0f, 0.0f)
         });
-    world.addComponent<MeshRenderer>(redCube, MeshRenderer{ cubeMesh, redMaterial });
+    world.addComponent<MeshRenderer>(redCube, MeshRenderer{ cubeMesh, redMaterial});
     world.addComponent<Tag>(redCube, Tag{ "Rotating" });
 
     EntityId greenCube = world.createEntity();
@@ -70,7 +74,7 @@ void GameplayState::setupTestScene()
         glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
-    world.addComponent<MeshRenderer>(greenCube, MeshRenderer{ cubeMesh, greenMaterial });
+    world.addComponent<MeshRenderer>(greenCube, MeshRenderer{ cubeMesh, greenMaterial});
     world.addComponent<Tag>(greenCube, Tag{ "Bouncing" });
 
     EntityId yellowCube = world.createEntity();
@@ -80,25 +84,32 @@ void GameplayState::setupTestScene()
         glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
-    world.addComponent<MeshRenderer>(yellowCube, MeshRenderer{ cubeMesh, yellowMaterial });
+    world.addComponent<MeshRenderer>(yellowCube, MeshRenderer{ cubeMesh, yellowMaterial});
     world.addComponent<Tag>(yellowCube, Tag{ "Static" });
 
+    // Load textures with RESOURCE_MANAGER
+    auto textureResource = RESOURCE_MANAGER.load<Texture>("assets/t_cake.png");
     // Loaded model with RESOURCE_MANAGER
-    auto meshResource = RESOURCE_MANAGER.load<Mesh>("../../../assets/Skull.obj"); // Skull.obj - multi, teamugobj.obj - single
+    auto meshResource = RESOURCE_MANAGER.load<Mesh>("assets/cake.obj");
     if (meshResource && meshResource->isValid())
     {
         LOG_INFO("Successfully loaded mesh from file, adding to scene");
         Mesh* loadedMesh = meshResource->get();
+        Texture* loadedTexture = textureResource->get();
+        Material* loadedMaterial = new Material{ glm::vec4(0.5f, 0.5f, 0.5f, 1.0f), vertShaderResource->get(), fragShaderResource->get(), renderer };
+        loadedMaterial->diffuseTexture = loadedTexture;
+        loadedMaterial->hasTexture = true;
         EntityId loadedEntity = world.createEntity();
         world.addComponent<Transform>(loadedEntity, Transform{
-            glm::vec3(0.0f, 2.0f, 0.0f),
-            glm::quat(0.707f, -0.707f, 0.0f, 0.0f),
-            glm::vec3(0.5f, 0.5f, 0.5f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::quat(0.0f, 0.0f, 0.0f, 0.0f),
+            glm::vec3(0.03f, 0.03f, 0.03f),
             glm::vec3(0.0f, 0.0f, 0.0f)
             });
-        world.addComponent<MeshRenderer>(loadedEntity, MeshRenderer{ loadedMesh, purpleMaterial });
+        world.addComponent<MeshRenderer>(loadedEntity, MeshRenderer{ loadedMesh, loadedMaterial });
         world.addComponent<Tag>(loadedEntity, Tag{ "LoadedFromFile" });
     }
+
     else
     {
         LOG_WARNING("Failed to load mesh from file");
@@ -124,7 +135,7 @@ void GameplayState::setupTestScene()
     Light dirLight;
     dirLight.type = LightType::Directional;
     dirLight.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    dirLight.intensity = 0.6f;
+    dirLight.intensity = 0.5f;
     dirLight.direction = glm::vec3(0.57735f, -0.57735f, 0.57735f);
     dirLight.enabled = true;
     world.addComponent<Light>(directionalLight, dirLight);
@@ -133,7 +144,7 @@ void GameplayState::setupTestScene()
     Light dirLight2;
     dirLight2.type = LightType::Directional;
     dirLight2.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    dirLight2.intensity = 0.3;
+    dirLight2.intensity = 0.5f;
     dirLight2.direction = glm::vec3(-0.57735f, -0.57735f, 0.57735f);
     dirLight2.enabled = true;
     world.addComponent<Light>(directionalLight2, dirLight2);
@@ -142,7 +153,7 @@ void GameplayState::setupTestScene()
     Light dirLight3;
     dirLight3.type = LightType::Directional;
     dirLight3.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    dirLight3.intensity = 0.15f;
+    dirLight3.intensity = 0.2f;
     dirLight3.direction = glm::vec3(0.0f, -0.707f, -0.707f);
     dirLight3.enabled = true;
     world.addComponent<Light>(directionalLight3, dirLight3);

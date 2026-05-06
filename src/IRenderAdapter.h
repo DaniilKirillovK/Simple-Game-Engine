@@ -2,10 +2,13 @@
 #include <string>
 #include <cstdint>
 #include "InputHandler.h"
+#include "Resources/ShaderLoader/ShaderProgram.h"
 
 class Material;
 class Mesh;
 class Light;
+struct TextureData;
+struct ShaderProgram;
 
 struct Color 
 {
@@ -15,11 +18,6 @@ struct Color
     }
 };
 
-enum class ShaderType
-{
-    Vertex,
-    Fragment
-};
 
 class IRenderAdapter
 {
@@ -43,6 +41,9 @@ public:
     virtual std::vector<MouseMoveEvent> getMouseMoveEvents() = 0;
     virtual std::vector<MouseScrollEvent> getMouseScrollEvents() = 0;
 
+    virtual uint32_t createTexture(const TextureData& data) = 0;
+    virtual void destroyTexture(uint32_t handle) = 0;
+
     // 3D
     virtual void setModelMatrix(const float* matrix) = 0;
     virtual void setViewMatrix(const float* matrix) = 0;
@@ -51,6 +52,7 @@ public:
 
     virtual float getAspectRatio() = 0;
 
+    virtual void setShaderProgram(const ShaderProgram* shaderProgram) = 0;
     virtual void setMaterial(const Material* material) = 0;
     virtual void setLights(const std::vector<Light*>& lights) = 0;
 

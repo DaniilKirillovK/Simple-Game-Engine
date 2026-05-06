@@ -5,7 +5,6 @@
 #include <memory>
 #include <string>
 #include <functional>
-#include <mutex>
 #include <typeindex>
 #include <any>
 #include <algorithm>
@@ -66,7 +65,6 @@ private:
     template<typename T>
     LoaderList<T>& getLoaders();
 
-    mutable std::mutex mutex;
     std::unordered_map<std::type_index, std::any> caches;
     std::unordered_map<std::type_index, std::any> loaders;
 };
@@ -75,7 +73,6 @@ template<typename T>
 std::shared_ptr<Resource<T>> ResourceManager::load(const std::string& path)
 {
     {
-        std::lock_guard<std::mutex> lock(mutex);
         auto& cache = getCache<T>();
 
         auto it = cache.find(path);
@@ -104,7 +101,6 @@ std::shared_ptr<Resource<T>> ResourceManager::load(const std::string& path)
             return nullptr;
         }
 
-        // Use the highest priority loader (first in sorted list)
         data = loaders.front().second(path);
 
         if (!data) 
@@ -123,7 +119,6 @@ std::shared_ptr<Resource<T>> ResourceManager::load(const std::string& path)
 template<typename T>
 void ResourceManager::registerLoader(std::function<std::unique_ptr<T>(const std::string&)> loader, int priority)
 {
-    std::lock_guard<std::mutex> lock(mutex);
     auto& loaders = getLoaders<T>();
     loaders.push_back({ priority, loader });
 
@@ -136,8 +131,6 @@ void ResourceManager::registerLoader(std::function<std::unique_ptr<T>(const std:
 template<typename T>
 std::shared_ptr<Resource<T>> ResourceManager::get(const std::string& path)
 {
-    std::lock_guard<std::mutex> lock(mutex);
-
     auto& cache = getCache<T>();
     auto it = cache.find(path);
     if (it != cache.end()) 
@@ -169,8 +162,6 @@ bool ResourceManager::isLoaded(const std::string& path)
 template<typename T>
 void ResourceManager::unload(const std::string& path)
 {
-    std::lock_guard<std::mutex> lock(mutex);
-
     auto& cache = getCache<T>();
     auto it = cache.find(path);
     if (it != cache.end()) 
@@ -184,8 +175,6 @@ void ResourceManager::unload(const std::string& path)
 template<typename T>
 void ResourceManager::unloadAll()
 {
-    std::lock_guard<std::mutex> lock(mutex);
-
     auto& cache = getCache<T>();
     size_t count = cache.size();
     cache.clear();

@@ -13,7 +13,8 @@ out vec3 vWorldPosition;
 out vec3 vNormal;
 out vec2 vTexCoord;
 
-void main() {
+void main() 
+{
     vec4 worldPos = uModelMatrix * vec4(aPos, 1.0);
     vWorldPosition = worldPos.xyz;
     gl_Position = uProjectionMatrix * uViewMatrix * worldPos;

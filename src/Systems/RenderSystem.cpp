@@ -67,15 +67,15 @@ void RenderSystem::update(World& world, float deltaTime)
         glm::mat4 mvpMatrix = projectionMatrix * viewMatrix * modelMatrix;
         glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
 
+        renderAdapter->setShaderProgram(renderer->material->shaderProgram);
+
         renderAdapter->setModelMatrix(glm::value_ptr(modelMatrix));
         renderAdapter->setViewMatrix(glm::value_ptr(viewMatrix));
         renderAdapter->setProjectionMatrix(glm::value_ptr(projectionMatrix));
         renderAdapter->setNormalMatrix(glm::value_ptr(normalMatrix));
 
         renderAdapter->setLights(lights);
-
         renderAdapter->setMaterial(renderer->material);
-
         renderAdapter->drawMesh(renderer->mesh);
     }
 }

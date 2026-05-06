@@ -4,7 +4,9 @@
 #include "GameplayState.h"
 #include "OpenGLRenderAdapter.h"
 #include "Resources/ResourceManager.h"
-#include "Loaders/MeshLoader.h"
+#include "Resources/MeshLoader/MeshLoader.h"
+#include "Resources/TextureLoader/TextureLoader.h"
+#include "Resources/ShaderLoader/ShaderLoader.h"
 
 Application::Application()
 {
@@ -18,14 +20,16 @@ bool Application::initialize(int width, int height, const std::string& title)
 {
     LOG_INFO("Initializing application...");
 
-    MeshLoader::RegisterLoader();
-
     renderer = std::make_unique<OpenGLRenderAdapter>();
     if (!renderer->initialize(width, height)) 
     {
         LOG_ERROR("Failed to initialize renderer");
         return false;
     }
+
+    MeshLoader::getInstance().registerLoader();
+	TextureLoader::getInstance().registerLoader(renderer.get());
+    ShaderLoader::getInstance().registerLoader(renderer.get());
 
     currentState = std::make_unique<GameplayState>(*renderer, input);
     currentState->onEnter();

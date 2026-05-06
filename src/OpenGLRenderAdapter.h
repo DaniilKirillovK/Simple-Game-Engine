@@ -45,11 +45,16 @@ private:
     virtual void onMouseMove(double x, double y) override;
     virtual void onMouseScroll(double xoffset, double yoffset) override;
 
+    virtual uint32_t createTexture(const TextureData& data) override;
+    virtual void destroyTexture(uint32_t handle) override;
+
     virtual void setModelMatrix(const float* matrix) override;
     virtual void setViewMatrix(const float* matrix) override;
     virtual void setProjectionMatrix(const float* matrix) override;
     virtual void setNormalMatrix(const float* matrix) override;
     virtual float getAspectRatio() override;
+
+    virtual void setShaderProgram(const ShaderProgram* shaderProgram) override;
     virtual void setMaterial(const Material* material) override;
     virtual void setLights(const std::vector<Light*>& lights) override;
     virtual void drawMesh(const Mesh* mesh) override;
@@ -79,34 +84,8 @@ private:
     std::vector<Light*> currentLights;
 
     // ShaderLoader & buffers
-    std::shared_ptr<ShaderProgram> m_testShader;
-    unsigned int m_shaderProgram;
-    struct UniformLocations 
-    {
-        GLint modelMatrix = -1;
-        GLint viewMatrix = -1;
-        GLint projectionMatrix = -1;
-        GLint normalMatrix = -1;
+    const ShaderProgram* m_shaderProgram;
 
-        // Material
-        GLint materialDiffuseColor = -1;
-        GLint materialSpecularColor = -1;
-        GLint materialAmbientColor = -1;
-        GLint materialShininess = -1;
-        GLint materialHasTexture = -1;
-
-        GLint numLights = -1;
-        GLint lightTypes[8] = { -1 };
-        GLint lightColors[8] = { -1 };
-        GLint lightIntensities[8] = { -1 };
-        GLint lightPositions[8] = { -1 };
-        GLint lightDirections[8] = { -1 };
-        GLint lightConstants[8] = { -1 };
-        GLint lightLinears[8] = { -1 };
-        GLint lightQuadratics[8] = { -1 };
-        GLint lightCutOffs[8] = { -1 };
-        GLint lightOuterCutOffs[8] = { -1 };
-    } uniforms;
     std::unordered_map<Mesh*, GLuint> meshVAOs;
     std::unordered_map<Mesh*, GLuint> meshVBOs;
     std::unordered_map<Mesh*, GLuint> meshEBOs;
@@ -117,6 +96,4 @@ private:
 
     static constexpr unsigned int DEFAULT_WIDTH = 800;
     static constexpr unsigned int DEFAULT_HEIGHT = 600;
-
-    void CompileTestShaders();
 };
