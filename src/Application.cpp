@@ -34,6 +34,8 @@ bool Application::initialize(int width, int height, const std::string& title)
     currentState = std::make_unique<GameplayState>(*renderer, input);
     currentState->onEnter();
 
+    bindActions();
+
     running = true;
     lastTime = std::chrono::high_resolution_clock::now();
     LOG_INFO("Application initialized successfully");
@@ -60,6 +62,16 @@ void Application::shutdown()
 {
     LOG_INFO("Shutting down application");
     if (renderer) renderer->shutdown();
+}
+
+void Application::bindActions()
+{
+    input.bindAction("MoveForward", KeyCode::KEY_W);
+    input.bindAction("MoveBack", KeyCode::KEY_S);
+    input.bindAction("MoveLeft", KeyCode::KEY_A);
+    input.bindAction("MoveRight", KeyCode::KEY_D);
+    input.bindAction("MoveUp", KeyCode::KEY_SPACE);
+    input.bindAction("MoveDown", KeyCode::KEY_LEFT_CONTROL);
 }
 
 void Application::handleEvents()

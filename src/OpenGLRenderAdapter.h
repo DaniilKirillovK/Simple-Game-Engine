@@ -5,6 +5,11 @@
 #include <iostream>
 #include <glm/glm.hpp>
 
+struct DebugVertex
+{
+    glm::vec3 position;
+    glm::vec4 color;
+};
 
 struct ShaderProgram;
 
@@ -57,6 +62,13 @@ private:
     virtual void setShaderProgram(const ShaderProgram* shaderProgram) override;
     virtual void setMaterial(const Material* material) override;
     virtual void setLights(const std::vector<Light*>& lights) override;
+
+    virtual void beginDebugDraw() override;
+    virtual void endDebugDraw() override;
+    virtual void drawDebugLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color) override;
+    virtual void drawDebugAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color) override;
+    virtual void drawDebugSphere(const glm::vec3& center, float radius, const glm::vec4& color, int segments = 16) override;
+
     virtual void drawMesh(const Mesh* mesh) override;
 
     bool initGLFW(int width, int height);
@@ -68,6 +80,10 @@ private:
     void updateProjectionMatrix();
 
     void createMeshVAO(Mesh* mesh);
+
+    void setupDebugBuffers();
+    void flushDebugDraw();
+    void createDebugShader();
 
     // Key Events
     std::vector<KeyEvent> keyEvents;
@@ -93,6 +109,12 @@ private:
     GLFWwindow* m_window;
     int m_width;
     int m_height;
+
+    // Debug
+    unsigned int m_debugVAO = 0;
+    unsigned int m_debugVBO = 0;
+    unsigned int m_debugShaderProgram = 0;
+    std::vector<DebugVertex> m_debugVertices;
 
     static constexpr unsigned int DEFAULT_WIDTH = 800;
     static constexpr unsigned int DEFAULT_HEIGHT = 600;

@@ -14,7 +14,7 @@ void InputHandler::processKeyEvents(const std::vector<KeyEvent>& events)
 {
     for (const auto& event : events) 
     {
-        currentKeys[event.keyCode] = event.pressed;
+        m_currentKeys[event.keyCode] = event.pressed;
         if (event.pressed == true)
         {
             LOG_INPUT("Key pressed");
@@ -30,7 +30,7 @@ void InputHandler::processMouseButtonEvents(const std::vector<MouseButtonEvent>&
 {
     for (const auto& event : events) 
     {
-        currentMouseButtons[event.button] = event.pressed;
+        m_currentMouseButtons[event.button] = event.pressed;
         if (event.pressed == true)
         {
             LOG_INPUT("Mouse button pressed");
@@ -68,16 +68,52 @@ void InputHandler::processMouseScrollEvents(const std::vector<MouseScrollEvent>&
     }
 }
 
-bool InputHandler::isKeyPressed(int key) const
+bool InputHandler::isKeyPressed(KeyCode key) const
 {
-    auto it = currentKeys.find(key);
-    return it != currentKeys.end() && it->second;
+    auto it = m_currentKeys.find(key);
+    return it != m_currentKeys.end() && it->second;
 }
 
 bool InputHandler::isMouseButtonPressed(int button) const
 {
-    auto it = currentMouseButtons.find(button);
-    return it != currentMouseButtons.end() && it->second;
+    auto it = m_currentMouseButtons.find(button);
+    return it != m_currentMouseButtons.end() && it->second;
+}
+
+void InputHandler::bindAction(const std::string& actionName, KeyCode keyCode)
+{
+    m_actionMap[actionName] = keyCode;
+    LOG_INFO("Action bound: " + actionName + " -> key " + std::to_string(static_cast<int>(keyCode)));
+}
+
+void InputHandler::unbindAction(const std::string& actionName)
+{
+    auto it = m_actionMap.find(actionName);
+    if (it != m_actionMap.end()) 
+    {
+        m_actionMap.erase(it);
+        LOG_INFO("Action unbound: " + actionName);
+    }
+}
+
+bool InputHandler::isActionActive(const std::string& actionName) const
+{
+    auto it = m_actionMap.find(actionName);
+    if (it != m_actionMap.end()) 
+    {
+        return isKeyPressed(it->second);
+    }
+    return false;
+}
+
+KeyCode InputHandler::getActionKey(const std::string& actionName) const
+{
+    auto it = m_actionMap.find(actionName);
+    if (it != m_actionMap.end()) 
+    {
+        return it->second;
+    }
+    return KeyCode::KEY_UNKNOWN;
 }
 
 void InputHandler::clearFrameState()

@@ -14,6 +14,33 @@
 #include "Resources/ShaderLoader/ShaderLoader.h"
 #include "Resources/ShaderLoader/ShaderProgram.h"
 #include "Resources/TextureLoader/Texture.h"
+#include "Common/KeyCode.h"
+
+static const char* debugVertexShaderSource = R"(
+    #version 330 core
+    layout(location = 0) in vec3 aPos;
+    layout(location = 1) in vec4 aColor;
+    
+    uniform mat4 uView;
+    uniform mat4 uProjection;
+    
+    out vec4 vColor;
+    
+    void main() {
+        gl_Position = uProjection * uView * vec4(aPos, 1.0);
+        vColor = aColor;
+    }
+)";
+
+static const char* debugFragmentShaderSource = R"(
+    #version 330 core
+    in vec4 vColor;
+    out vec4 FragColor;
+    
+    void main() {
+        FragColor = vColor;
+    }
+)";
 
 static OpenGLRenderAdapter *g_instance = nullptr;
 
@@ -48,6 +75,9 @@ bool OpenGLRenderAdapter::initialize(int width, int height)
     }
 
     setupOpenGLState();
+
+    setupDebugBuffers();
+    createDebugShader();
 
     std::string openGLVersion = reinterpret_cast<const char *>(glGetString(GL_VERSION));
     std::string openGLRenderer = reinterpret_cast<const char *>(glGetString(GL_VERSION));
@@ -109,7 +139,7 @@ void OpenGLRenderAdapter::framebufferSizeCallback(GLFWwindow *window, int width,
 void OpenGLRenderAdapter::onKey(int key, int action)
 {
     KeyEvent event;
-    event.keyCode = key;
+    event.keyCode = static_cast<KeyCode>(key);
 
     if (action == GLFW_PRESS)
     {
@@ -348,6 +378,67 @@ void OpenGLRenderAdapter::setLights(const std::vector<Light *> &lights)
     }
 }
 
+void OpenGLRenderAdapter::beginDebugDraw()
+{
+    m_debugVertices.clear();
+}
+
+void OpenGLRenderAdapter::endDebugDraw()
+{
+    flushDebugDraw();
+}
+
+void OpenGLRenderAdapter::drawDebugLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color)
+{
+    DebugVertex v1{ start, color };
+    DebugVertex v2{ end, color };
+    m_debugVertices.push_back(v1);
+    m_debugVertices.push_back(v2);
+}
+
+void OpenGLRenderAdapter::drawDebugAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color)
+{
+    glm::vec3 corners[8] = 
+    {
+        {min.x, min.y, min.z}, {max.x, min.y, min.z},
+        {max.x, min.y, max.z}, {min.x, min.y, max.z},
+        {min.x, max.y, min.z}, {max.x, max.y, min.z},
+        {max.x, max.y, max.z}, {min.x, max.y, max.z}
+    };
+
+    int edges[12][2] = 
+    {
+        {0,1}, {1,2}, {2,3}, {3,0},
+        {4,5}, {5,6}, {6,7}, {7,4},
+        {0,4}, {1,5}, {2,6}, {3,7}
+    };
+
+    for (const auto& edge : edges) 
+    {
+        drawDebugLine(corners[edge[0]], corners[edge[1]], color);
+    }
+}
+
+void OpenGLRenderAdapter::drawDebugSphere(const glm::vec3& center, float radius, const glm::vec4& color, int segments)
+{
+    auto drawCircle = [&](const glm::vec3& axis1, const glm::vec3& axis2) {
+        for (int i = 0; i < segments; ++i) 
+        {
+            float angle1 = glm::two_pi<float>() * i / segments;
+            float angle2 = glm::two_pi<float>() * (i + 1) / segments;
+
+            glm::vec3 p1 = center + (axis1 * cos(angle1) + axis2 * sin(angle1)) * radius;
+            glm::vec3 p2 = center + (axis1 * cos(angle2) + axis2 * sin(angle2)) * radius;
+
+            drawDebugLine(p1, p2, color);
+        }
+    };
+
+    drawCircle(glm::vec3(1, 0, 0), glm::vec3(0, 1, 0));
+    drawCircle(glm::vec3(1, 0, 0), glm::vec3(0, 0, 1));
+    drawCircle(glm::vec3(0, 1, 0), glm::vec3(0, 0, 1));
+}
+
 void OpenGLRenderAdapter::drawMesh(const Mesh *mesh)
 {
     if (!mesh)
@@ -528,6 +619,90 @@ void OpenGLRenderAdapter::createMeshVAO(Mesh *mesh)
     meshEBOs[mesh] = EBO;
 }
 
+void OpenGLRenderAdapter::setupDebugBuffers()
+{
+    glGenVertexArrays(1, &m_debugVAO);
+    glGenBuffers(1, &m_debugVBO);
+
+    glBindVertexArray(m_debugVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_debugVBO);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(DebugVertex), (void*)offsetof(DebugVertex, position));
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(DebugVertex), (void*)offsetof(DebugVertex, color));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
+
+void OpenGLRenderAdapter::flushDebugDraw()
+{
+    if (m_debugVertices.empty()) return;
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLineWidth(2.0f);
+
+    glUseProgram(m_debugShaderProgram);
+
+    int viewLoc = glGetUniformLocation(m_debugShaderProgram, "uView");
+    int projLoc = glGetUniformLocation(m_debugShaderProgram, "uProjection");
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(currentViewMatrix));
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(currentProjectionMatrix));
+
+    glBindBuffer(GL_ARRAY_BUFFER, m_debugVBO);
+    glBufferData(GL_ARRAY_BUFFER, m_debugVertices.size() * sizeof(DebugVertex),
+        m_debugVertices.data(), GL_DYNAMIC_DRAW);
+
+    glBindVertexArray(m_debugVAO);
+    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_debugVertices.size()));
+
+    glBindVertexArray(0);
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+}
+
+void OpenGLRenderAdapter::createDebugShader()
+{
+    auto compileShader = [](const char* source, GLenum type) -> unsigned int {
+        unsigned int shader = glCreateShader(type);
+        glShaderSource(shader, 1, &source, nullptr);
+        glCompileShader(shader);
+
+        int success;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        if (!success) 
+        {
+            char infoLog[512];
+            glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+            LOG_INFO("Debug shader compilation error: " + std::string(infoLog));
+        }
+        return shader;
+    };
+
+    unsigned int vertexShader = compileShader(debugVertexShaderSource, GL_VERTEX_SHADER);
+    unsigned int fragmentShader = compileShader(debugFragmentShaderSource, GL_FRAGMENT_SHADER);
+
+    m_debugShaderProgram = glCreateProgram();
+    glAttachShader(m_debugShaderProgram, vertexShader);
+    glAttachShader(m_debugShaderProgram, fragmentShader);
+    glLinkProgram(m_debugShaderProgram);
+
+    int success;
+    glGetProgramiv(m_debugShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) 
+    {
+        char infoLog[512];
+        glGetProgramInfoLog(m_debugShaderProgram, 512, nullptr, infoLog);
+        LOG_INFO("Debug shader linking error: " + std::string(infoLog));
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+}
+
 bool OpenGLRenderAdapter::shouldClose() const
 {
     return glfwWindowShouldClose(m_window);
@@ -549,7 +724,7 @@ bool OpenGLRenderAdapter::checkShaderCompileErrors(unsigned int shader, const st
         if (!success)
         {
             glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-            LOG_ERROR("Shader compilation error " + std::string(infoLog));
+            LOG_ERROR("Shader compilation error: " + std::string(infoLog));
             return false;
         }
     }

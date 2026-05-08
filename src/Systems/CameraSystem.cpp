@@ -28,27 +28,27 @@ void CameraSystem::update(World& world, float deltaTime)
     float moveSpeed = 10.0f;
     float lookSpeed = 300.0f;
 
-    if (inputHandler->isKeyPressed(OpenGLKeyCode::W)) 
+    if (inputHandler->isActionActive("MoveForward"))
     {
         transform->position += camera->forward * moveSpeed * deltaTime;
     }
-    if (inputHandler->isKeyPressed(OpenGLKeyCode::S)) 
+    if (inputHandler->isActionActive("MoveBack"))
     {
         transform->position -= camera->forward * moveSpeed * deltaTime;
     }
-    if (inputHandler->isKeyPressed(OpenGLKeyCode::A)) 
+    if (inputHandler->isActionActive("MoveLeft"))
     {
         transform->position -= camera->right * moveSpeed * deltaTime;
     }
-    if (inputHandler->isKeyPressed(OpenGLKeyCode::D)) 
+    if (inputHandler->isActionActive("MoveRight"))
     {
         transform->position += camera->right * moveSpeed * deltaTime;
     }
-    if (inputHandler->isKeyPressed(OpenGLKeyCode::Space)) 
+    if (inputHandler->isActionActive("MoveUp"))
     {
         transform->position += glm::vec3(0.0f, moveSpeed * deltaTime, 0.0f);
     }
-    if (inputHandler->isKeyPressed(OpenGLKeyCode::LeftCtrl))
+    if (inputHandler->isActionActive("MoveDown"))
     {
         transform->position -= glm::vec3(0.0f, moveSpeed * deltaTime, 0.0f);
     }

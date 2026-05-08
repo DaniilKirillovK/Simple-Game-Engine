@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <cstdint>
+#include <glm/glm.hpp>
 #include "InputHandler.h"
 #include "Resources/ShaderLoader/ShaderProgram.h"
 
@@ -55,6 +56,13 @@ public:
     virtual void setShaderProgram(const ShaderProgram* shaderProgram) = 0;
     virtual void setMaterial(const Material* material) = 0;
     virtual void setLights(const std::vector<Light*>& lights) = 0;
+
+    // Debug
+    virtual void beginDebugDraw() = 0;
+    virtual void endDebugDraw() = 0;
+    virtual void drawDebugLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color) = 0;
+    virtual void drawDebugAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color) = 0;
+    virtual void drawDebugSphere(const glm::vec3& center, float radius, const glm::vec4& color, int segments = 16) = 0;
 
     virtual void drawMesh(const Mesh* mesh) = 0;
 

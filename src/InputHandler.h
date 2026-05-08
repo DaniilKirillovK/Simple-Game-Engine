@@ -1,20 +1,22 @@
 #pragma once
 #include <cstdint>
 #include <unordered_map>
+#include <string>
+#include "Common/KeyCode.h"
 
-struct KeyEvent
+struct KeyEvent 
 {
-    int keyCode;
+    KeyCode keyCode;
     bool pressed;
 };
 
-struct MouseButtonEvent
+struct MouseButtonEvent 
 {
     int button;
     bool pressed;
 };
 
-struct MouseMoveEvent
+struct MouseMoveEvent 
 {
     double x, y;
 };
@@ -24,8 +26,7 @@ struct MouseScrollEvent
     double xOffset, yOffset;
 };
 
-class InputHandler 
-{
+class InputHandler {
 public:
     InputHandler() = default;
 
@@ -36,7 +37,8 @@ public:
     void processMouseMoveEvents(const std::vector<MouseMoveEvent>& events);
     void processMouseScrollEvents(const std::vector<MouseScrollEvent>& events);
 
-    bool isKeyPressed(int key) const;
+    bool isKeyPressed(KeyCode key) const;
+
     bool isMouseButtonPressed(int button) const;
 
     double getMouseX() const { return mouseX; }
@@ -47,10 +49,19 @@ public:
     double getMouseScrollX() const { return scrollX; }
     double getMouseScrollY() const { return scrollY; }
 
+    void bindAction(const std::string& actionName, KeyCode keyCode);
+    void unbindAction(const std::string& actionName);
+    bool isActionActive(const std::string& actionName) const;
+    KeyCode getActionKey(const std::string& actionName) const;
+
     void clearFrameState();
+
 private:
-    std::unordered_map<int, bool> currentKeys;
-    std::unordered_map<int, bool> currentMouseButtons;
+    std::unordered_map<KeyCode, bool> m_currentKeys;
+    std::unordered_map<KeyCode, bool> m_previousKeys;
+
+    std::unordered_map<int, bool> m_currentMouseButtons;
+    std::unordered_map<int, bool> m_previousMouseButtons;
 
     double mouseX = 0.0;
     double mouseY = 0.0;
@@ -61,4 +72,8 @@ private:
 
     double scrollX = 0.0;
     double scrollY = 0.0;
+    double lastScrollX = 0.0;
+    double lastScrollY = 0.0;
+
+    std::unordered_map<std::string, KeyCode> m_actionMap;
 };

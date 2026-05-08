@@ -19,6 +19,7 @@ public:
     void shutdown();
 
 private:
+    void bindActions();
     void handleEvents();
     void update(float deltaTime);
     void render();
