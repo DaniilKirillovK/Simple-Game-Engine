@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <glm/glm.hpp>
+#include "libs/imgui/imgui.h"
 
 struct DebugVertex
 {
@@ -36,6 +37,11 @@ public:
     virtual unsigned int linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader) override;
     virtual void deleteShaderObject(unsigned int shader) override;
     virtual void deleteShaderProgram(unsigned int program) override;
+
+    virtual void initImGui() override;
+    virtual void beginImGuiFrame() override;
+    virtual void endImGuiFrame() override;
+    virtual void shutdownImGui() override;
 
 private:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -70,6 +76,16 @@ private:
     virtual void drawDebugSphere(const glm::vec3& center, float radius, const glm::vec4& color, int segments = 16) override;
 
     virtual void drawMesh(const Mesh* mesh) override;
+
+    void createRenderTexture(int width, int height);
+    void beginRenderToTexture();
+    void endRenderToTexture();
+    unsigned int getRenderTexture() const { return m_renderTexture; }
+    void resizeRenderTexture(int width, int height);
+
+    void renderUI();
+    void renderUIViewport();
+    static void SizeCallback(ImGuiSizeCallbackData* data);
 
     bool initGLFW(int width, int height);
     bool initGLAD();
@@ -110,12 +126,21 @@ private:
     int m_width;
     int m_height;
 
+    unsigned int m_fbo = 0;
+    unsigned int m_renderTexture = 0;
+    unsigned int m_depthBuffer = 0;
+    int m_textureWidth = 0;
+    int m_textureHeight = 0;
+
     // Debug
     unsigned int m_debugVAO = 0;
     unsigned int m_debugVBO = 0;
     unsigned int m_debugShaderProgram = 0;
     std::vector<DebugVertex> m_debugVertices;
 
-    static constexpr unsigned int DEFAULT_WIDTH = 800;
-    static constexpr unsigned int DEFAULT_HEIGHT = 600;
+    ImVec2 m_viewportSize = ImVec2(0, 0);
+    bool m_viewportHovered = false;
+
+    static constexpr unsigned int DEFAULT_WIDTH = 1920;
+    static constexpr unsigned int DEFAULT_HEIGHT = 1080;
 };

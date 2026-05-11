@@ -15,6 +15,9 @@
 #include "Resources/ShaderLoader/ShaderProgram.h"
 #include "Resources/TextureLoader/Texture.h"
 #include "Common/KeyCode.h"
+#include "libs/imgui/imgui.h"
+#include "libs/imgui/backends/imgui_impl_glfw.h"
+#include "libs/imgui/backends/imgui_impl_opengl3.h"
 
 static const char* debugVertexShaderSource = R"(
     #version 330 core
@@ -74,6 +77,8 @@ bool OpenGLRenderAdapter::initialize(int width, int height)
         return false;
     }
 
+    initImGui();
+
     setupOpenGLState();
 
     setupDebugBuffers();
@@ -89,7 +94,22 @@ bool OpenGLRenderAdapter::initialize(int width, int height)
 
 void OpenGLRenderAdapter::render()
 {
+    endRenderToTexture();
+
+    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    beginImGuiFrame();
+    ImGui::DockSpaceOverViewport();
+
+    renderUI();
+    
+    endImGuiFrame();
     glfwSwapBuffers(m_window);
+
+    resizeRenderTexture((int)m_viewportSize.x, (int)m_viewportSize.y);
+    beginRenderToTexture();
+    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
@@ -118,6 +138,8 @@ void OpenGLRenderAdapter::shutdown()
     {
         glDeleteProgram(m_shaderProgram->programId);
     }
+
+    shutdownImGui();
 
     if (m_window)
     {
@@ -235,6 +257,45 @@ void OpenGLRenderAdapter::destroyTexture(uint32_t handle)
         GLuint textureID = handle;
         glDeleteTextures(1, &textureID);
     }
+}
+
+void OpenGLRenderAdapter::initImGui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplGlfw_InitForOpenGL(m_window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
+    LOG_INFO("OpenGLRenderAdapter: ImGui initialized");
+}
+
+void OpenGLRenderAdapter::beginImGuiFrame()
+{
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void OpenGLRenderAdapter::endImGuiFrame()
+{
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void OpenGLRenderAdapter::shutdownImGui()
+{
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    LOG_INFO("OpenGLRenderAdapter: ImGui shutdown");
 }
 
 void OpenGLRenderAdapter::setModelMatrix(const float *matrix)
@@ -476,6 +537,132 @@ void OpenGLRenderAdapter::drawMesh(const Mesh *mesh)
     glBindVertexArray(0);
 }
 
+void OpenGLRenderAdapter::createRenderTexture(int width, int height)
+{
+    if (width <= 0 || height <= 0) return;
+
+    m_textureWidth = width;
+    m_textureHeight = height;
+
+    glGenTextures(1, &m_renderTexture);
+    glBindTexture(GL_TEXTURE_2D, m_renderTexture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenRenderbuffers(1, &m_depthBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, m_depthBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+
+
+    glGenFramebuffers(1, &m_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_renderTexture, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthBuffer);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        LOG_ERROR("Framebuffer is not complete!");
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    //LOG_INFO("Created render texture: %dx%d", width, height);
+}
+
+void OpenGLRenderAdapter::beginRenderToTexture()
+{
+    if (m_fbo == 0) return;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+    glViewport(0, 0, m_textureWidth, m_textureHeight);
+}
+
+void OpenGLRenderAdapter::endRenderToTexture()
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    int windowWidth, windowHeight;
+    glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
+    glViewport(0, 0, windowWidth, windowHeight);
+}
+
+void OpenGLRenderAdapter::resizeRenderTexture(int width, int height)
+{
+    if (width == m_textureWidth && height == m_textureHeight) return;
+
+    if (m_renderTexture) glDeleteTextures(1, &m_renderTexture);
+    if (m_depthBuffer) glDeleteRenderbuffers(1, &m_depthBuffer);
+    if (m_fbo) glDeleteFramebuffers(1, &m_fbo);
+
+    createRenderTexture(width, height);
+}
+
+void OpenGLRenderAdapter::renderUI()
+{
+    renderUIViewport();
+
+    if (ImGui::Begin("My Window"))
+    {
+        ImGui::Text("Hello, Engine!");
+        ImGui::Button("Click");
+    }
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderUIViewport()
+{
+    float aspectRatio = 16.0f / 9.0f;
+    ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    m_viewportSize = ImGui::GetContentRegionAvail();
+    m_viewportHovered = ImGui::IsWindowHovered();
+
+    if (m_renderTexture != 0 && m_viewportSize.x > 0 && m_viewportSize.y > 0)
+    {
+        float targetWidth = m_viewportSize.y * aspectRatio;
+        ImVec2 imageSize;
+
+        if (targetWidth <= m_viewportSize.x)
+        {
+            imageSize = ImVec2(targetWidth, m_viewportSize.y);
+            float offsetX = (m_viewportSize.x - targetWidth) * 0.5f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
+        }
+        else
+        {
+            imageSize = ImVec2(m_viewportSize.x, m_viewportSize.x / aspectRatio);
+            float offsetY = (m_viewportSize.y - imageSize.y) * 0.5f;
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
+        }
+
+        ImGui::Image((ImTextureID)(intptr_t)m_renderTexture, imageSize,
+            ImVec2(0, 1),
+            ImVec2(1, 0));
+    }
+    else
+    {
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImVec2 pos = ImGui::GetCursorScreenPos();
+        draw->AddRectFilled(pos, ImVec2(pos.x + m_viewportSize.x, pos.y + m_viewportSize.y),
+            IM_COL32(50, 50, 80, 255));
+        draw->AddText(pos, IM_COL32(255, 255, 255, 255), "Loading...");
+    }
+
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::SizeCallback(ImGuiSizeCallbackData* data)
+{
+    float aspectRatio = *(float*)data->UserData;
+    float newHeight = data->DesiredSize.x / aspectRatio;
+    data->DesiredSize.y = newHeight;
+}
 
 bool OpenGLRenderAdapter::initGLFW(int width, int height)
 {
@@ -491,7 +678,10 @@ bool OpenGLRenderAdapter::initGLFW(int width, int height)
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
     LOG_INFO("Requesting OpenGL debug context");
 
-    m_window = glfwCreateWindow(width, height, "OpenGL Window", nullptr, nullptr);
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+    m_window = glfwCreateWindow(mode->width, mode->height, "OpenGL Window", nullptr, nullptr);
     if (!m_window)
     {
         return false;

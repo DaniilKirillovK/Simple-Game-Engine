@@ -45,6 +45,12 @@ public:
     virtual uint32_t createTexture(const TextureData& data) = 0;
     virtual void destroyTexture(uint32_t handle) = 0;
 
+    // ImGui
+    virtual void initImGui() = 0;
+    virtual void beginImGuiFrame() = 0;
+    virtual void endImGuiFrame() = 0;
+    virtual void shutdownImGui() = 0;
+
     // 3D
     virtual void setModelMatrix(const float* matrix) = 0;
     virtual void setViewMatrix(const float* matrix) = 0;

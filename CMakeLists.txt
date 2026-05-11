@@ -8,6 +8,13 @@ set(GLFW_DIR "${CMAKE_SOURCE_DIR}/libs/glfw")
 set(GLAD_DIR "${CMAKE_SOURCE_DIR}/glad")
 set(GLM_DIR "${CMAKE_SOURCE_DIR}/libs/glm")
 set(ASSIMP_DIR "${CMAKE_SOURCE_DIR}/libs/assimp")
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/libs/imgui")
+
+file(GLOB IMGUI_SOURCES
+    "${IMGUI_DIR}/*.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_glfw.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp"
+)
 
 list(APPEND SOURCES ${GLAD_DIR}/src/glad.c)
 
@@ -17,7 +24,7 @@ set(GLFW_LIB_NAME "glfw3")
 set(ASSIMP_LIB_DIR "${ASSIMP_DIR}/lib")
 set(ASSIMP_LIB_NAME "assimp-vc143-mt")
 
-add_executable(${PROJECT_NAME} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp")
+add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp")
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}

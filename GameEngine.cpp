@@ -12,7 +12,7 @@ int main()
     LOG_INFO("Starting engine...");
 
     Application app;
-    if (!app.initialize(800, 600, "Simple Game Engine")) 
+    if (!app.initialize(1920, 1080, "Simple Game Engine")) 
     {
         return -1;
     }

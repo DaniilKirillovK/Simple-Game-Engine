@@ -245,7 +245,7 @@ void GameplayState::setupTestScene()
         });
 
     Camera cam;
-    cam.aspectRatio = 800.0f / 600.0f;
+    cam.aspectRatio = 16.f / 9.f;
     cam.fov = 45.0f;
     cam.nearPlane = 0.1f;
     cam.farPlane = 100.0f;
