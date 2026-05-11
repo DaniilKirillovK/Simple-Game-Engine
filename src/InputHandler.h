@@ -28,7 +28,14 @@ struct MouseScrollEvent
 
 class InputHandler {
 public:
-    InputHandler() = default;
+    static InputHandler& getInstance() 
+    {
+        static InputHandler instance;
+        return instance;
+    }
+
+    InputHandler(const InputHandler&) = delete;
+    InputHandler& operator=(const InputHandler&) = delete;
 
     void update();
 
@@ -38,8 +45,12 @@ public:
     void processMouseScrollEvents(const std::vector<MouseScrollEvent>& events);
 
     bool isKeyPressed(KeyCode key) const;
+    bool isKeyJustPressed(KeyCode key) const;
+    bool isKeyJustReleased(KeyCode key) const;
 
     bool isMouseButtonPressed(int button) const;
+    bool isMouseButtonJustPressed(int button) const;
+    bool isMouseButtonJustReleased(int button) const;
 
     double getMouseX() const { return mouseX; }
     double getMouseY() const { return mouseY; }
@@ -53,10 +64,14 @@ public:
     void unbindAction(const std::string& actionName);
     bool isActionActive(const std::string& actionName) const;
     KeyCode getActionKey(const std::string& actionName) const;
+    bool isActionJustPressed(const std::string& actionName) const;
+    bool isActionJustReleased(const std::string& actionName) const;
 
     void clearFrameState();
 
 private:
+    InputHandler() = default;
+
     std::unordered_map<KeyCode, bool> m_currentKeys;
     std::unordered_map<KeyCode, bool> m_previousKeys;
 

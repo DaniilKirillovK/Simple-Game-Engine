@@ -3,6 +3,9 @@
 
 void InputHandler::update()
 {
+    m_previousKeys = m_currentKeys;
+    m_previousMouseButtons = m_currentMouseButtons;
+
     mouseDeltaX = 0.0;
     mouseDeltaY = 0.0;
 
@@ -74,10 +77,42 @@ bool InputHandler::isKeyPressed(KeyCode key) const
     return it != m_currentKeys.end() && it->second;
 }
 
+bool InputHandler::isKeyJustPressed(KeyCode key) const
+{
+    bool current = isKeyPressed(key);
+    auto it = m_previousKeys.find(key);
+    bool previous = (it != m_previousKeys.end()) ? it->second : false;
+    return current && !previous;
+}
+
+bool InputHandler::isKeyJustReleased(KeyCode key) const
+{
+    bool current = isKeyPressed(key);
+    auto it = m_previousKeys.find(key);
+    bool previous = (it != m_previousKeys.end()) ? it->second : false;
+    return !current && previous;
+}
+
 bool InputHandler::isMouseButtonPressed(int button) const
 {
     auto it = m_currentMouseButtons.find(button);
     return it != m_currentMouseButtons.end() && it->second;
+}
+
+bool InputHandler::isMouseButtonJustPressed(int button) const
+{
+    bool current = isMouseButtonPressed(button);
+    auto it = m_previousMouseButtons.find(button);
+    bool previous = (it != m_previousMouseButtons.end()) ? it->second : false;
+    return current && !previous;
+}
+
+bool InputHandler::isMouseButtonJustReleased(int button) const
+{
+    bool current = isMouseButtonPressed(button);
+    auto it = m_previousMouseButtons.find(button);
+    bool previous = (it != m_previousMouseButtons.end()) ? it->second : false;
+    return !current && previous;
 }
 
 void InputHandler::bindAction(const std::string& actionName, KeyCode keyCode)
@@ -114,6 +149,26 @@ KeyCode InputHandler::getActionKey(const std::string& actionName) const
         return it->second;
     }
     return KeyCode::KEY_UNKNOWN;
+}
+
+bool InputHandler::isActionJustPressed(const std::string& actionName) const
+{
+    auto it = m_actionMap.find(actionName);
+    if (it != m_actionMap.end()) 
+    {
+        return isKeyJustPressed(it->second);
+    }
+    return false;
+}
+
+bool InputHandler::isActionJustReleased(const std::string& actionName) const
+{
+    auto it = m_actionMap.find(actionName);
+    if (it != m_actionMap.end()) 
+    {
+        return isKeyJustReleased(it->second);
+    }
+    return false;
 }
 
 void InputHandler::clearFrameState()

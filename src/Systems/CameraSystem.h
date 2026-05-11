@@ -5,10 +5,9 @@
 class CameraSystem : public ISystem
 {
 public:
-	CameraSystem(InputHandler* inputHandler) : inputHandler(inputHandler) {}
+	CameraSystem() {}
 
 	virtual void update(World& world, float deltaTime) override;
 
 private:
-	InputHandler* inputHandler;
 };

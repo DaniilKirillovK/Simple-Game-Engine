@@ -26,7 +26,7 @@ void GameplayState::onEnter()
 {
     world.addSystem(std::make_unique<PhysicsSystem>(&renderer));
 	world.addSystem(std::make_unique<RenderSystem>(&renderer));
-	world.addSystem(std::make_unique<CameraSystem>(&input));
+	world.addSystem(std::make_unique<CameraSystem>());
 	world.addSystem(std::make_unique<MovementSystem>());
 
 	setupTestScene();
@@ -157,57 +157,57 @@ void GameplayState::setupTestScene()
 
     EntityId purpleSphere = world.createEntity();
     world.addComponent<Transform>(purpleSphere, Transform{
-        glm::vec3(-3.6f, 3.0f, 0.0f),
+        glm::vec3(-3.6f, 12.f, 0.0f),
         glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
         glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
     world.addComponent<MeshRenderer>(purpleSphere, MeshRenderer{ sphereMesh, purpleMaterial });
-    world.addComponent<Rigidbody>(purpleSphere, Rigidbody{ 1.0f });
+    world.addComponent<Rigidbody>(purpleSphere, Rigidbody{ 1.0f, false, true });
     world.addComponent<Collider>(purpleSphere, Collider{ 0.5f });
 
     EntityId redSphere = world.createEntity();
     world.addComponent<Transform>(redSphere, Transform{
-        glm::vec3(-2.6f, 3.0f, 0.0f),
+        glm::vec3(-2.6f, 10.f, 0.0f),
         glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
         glm::vec3(3.0f, 3.0f, 3.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
     world.addComponent<MeshRenderer>(redSphere, MeshRenderer{ sphereMesh, redMaterial });
-    world.addComponent<Rigidbody>(redSphere, Rigidbody{ 4.0f });
+    world.addComponent<Rigidbody>(redSphere, Rigidbody{ 4.0f, false, true });
     world.addComponent<Collider>(redSphere, Collider{ 1.5f });
 
     EntityId greenSphere = world.createEntity();
     world.addComponent<Transform>(greenSphere, Transform{
-        glm::vec3(1.0f, 3.0f, 0.0f),
+        glm::vec3(1.0f, 15.f, 0.0f),
         glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
         glm::vec3(2.0f, 2.0f, 2.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
     world.addComponent<MeshRenderer>(greenSphere, MeshRenderer{ sphereMesh, greenMaterial });
-    world.addComponent<Rigidbody>(greenSphere, Rigidbody{ 2.0f });
+    world.addComponent<Rigidbody>(greenSphere, Rigidbody{ 2.0f, false, true });
     world.addComponent<Collider>(greenSphere, Collider{ 1.0f });
 
     EntityId blueSphere = world.createEntity();
     world.addComponent<Transform>(blueSphere, Transform{
-        glm::vec3(0.5f, 3.0f, 0.2f),
+        glm::vec3(0.5f, 10.f, 0.2f),
         glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
         glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
     world.addComponent<MeshRenderer>(blueSphere, MeshRenderer{ sphereMesh, blueMaterial });
-    world.addComponent<Rigidbody>(blueSphere, Rigidbody{ 1.0f });
+    world.addComponent<Rigidbody>(blueSphere, Rigidbody{ 1.0f, false, true });
     world.addComponent<Collider>(blueSphere, Collider{ 0.5f });
 
     EntityId yellowSphere = world.createEntity();
     world.addComponent<Transform>(yellowSphere, Transform{
-        glm::vec3(-3.6f, 6.0f, 0.0f),
+        glm::vec3(-3.6f, 15.f, 0.0f),
         glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
         glm::vec3(2.0f, 2.0f, 2.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
     world.addComponent<MeshRenderer>(yellowSphere, MeshRenderer{ sphereMesh, yellowMaterial });
-    world.addComponent<Rigidbody>(yellowSphere, Rigidbody{ 2.0f });
+    world.addComponent<Rigidbody>(yellowSphere, Rigidbody{ 2.0f, false, true });
     world.addComponent<Collider>(yellowSphere, Collider{ 1.0f });
 
     //// Load textures with RESOURCE_MANAGER

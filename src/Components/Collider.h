@@ -49,3 +49,4 @@ public:
         return position + offset;
     }
 };
+

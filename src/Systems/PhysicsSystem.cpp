@@ -6,6 +6,7 @@
 #include "Components/Collider.h"
 #include <algorithm>
 #include "Logger.h"
+#include "InputHandler.h"
 #include <cmath>
 
 PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
@@ -38,7 +39,11 @@ void PhysicsSystem::update(World& world, float deltaTime)
         m_accumulator -= m_fixedTimestep;
     }
 
-    if (m_debugRendering && m_renderer) 
+    if (InputHandler::getInstance().isActionJustPressed("ToggleDebug"))
+    {
+        toggleDebugRendering();
+    }
+    if (m_debugRendering && m_renderer)
     {
         renderDebugColliders(world);
     }
@@ -130,7 +135,14 @@ void PhysicsSystem::renderDebugColliders(World& world)
                     ? glm::vec4(1.0f, 1.0f, 0.0f, 0.5f)
                     : glm::vec4(1.0f, 0.0f, 0.0f, 0.5f);
 
-                m_renderer->drawDebugAABB(worldMin, worldMax, color);
+                if (collider->type == ColliderType::Box)
+                {
+                    m_renderer->drawDebugAABB(worldMin, worldMax, color);
+                }
+                else if (collider->type == ColliderType::Sphere)
+                {
+                    m_renderer->drawDebugSphere(transform->position, collider->radius + 0.05f, color);
+                }
             }
         }
     }

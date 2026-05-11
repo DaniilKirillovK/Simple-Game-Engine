@@ -28,27 +28,27 @@ void CameraSystem::update(World& world, float deltaTime)
     float moveSpeed = 10.0f;
     float lookSpeed = 300.0f;
 
-    if (inputHandler->isActionActive("MoveForward"))
+    if (InputHandler::getInstance().isActionActive("MoveForward"))
     {
         transform->position += camera->forward * moveSpeed * deltaTime;
     }
-    if (inputHandler->isActionActive("MoveBack"))
+    if (InputHandler::getInstance().isActionActive("MoveBack"))
     {
         transform->position -= camera->forward * moveSpeed * deltaTime;
     }
-    if (inputHandler->isActionActive("MoveLeft"))
+    if (InputHandler::getInstance().isActionActive("MoveLeft"))
     {
         transform->position -= camera->right * moveSpeed * deltaTime;
     }
-    if (inputHandler->isActionActive("MoveRight"))
+    if (InputHandler::getInstance().isActionActive("MoveRight"))
     {
         transform->position += camera->right * moveSpeed * deltaTime;
     }
-    if (inputHandler->isActionActive("MoveUp"))
+    if (InputHandler::getInstance().isActionActive("MoveUp"))
     {
         transform->position += glm::vec3(0.0f, moveSpeed * deltaTime, 0.0f);
     }
-    if (inputHandler->isActionActive("MoveDown"))
+    if (InputHandler::getInstance().isActionActive("MoveDown"))
     {
         transform->position -= glm::vec3(0.0f, moveSpeed * deltaTime, 0.0f);
     }
@@ -59,8 +59,8 @@ void CameraSystem::update(World& world, float deltaTime)
     static bool firstMouse = true;
 
     double xpos, ypos;
-    xpos = inputHandler->getMouseX();
-    ypos = inputHandler->getMouseY();
+    xpos = InputHandler::getInstance().getMouseX();
+    ypos = InputHandler::getInstance().getMouseY();
 
     if (firstMouse) 
     {
@@ -74,7 +74,7 @@ void CameraSystem::update(World& world, float deltaTime)
     lastX = xpos;
     lastY = ypos;
 
-    if (inputHandler->isMouseButtonPressed(OpenGLMouseButton::Right)) 
+    if (InputHandler::getInstance().isMouseButtonPressed(OpenGLMouseButton::Right))
     {
         yaw += xoffset * lookSpeed * deltaTime;
         pitch += yoffset * lookSpeed * deltaTime;

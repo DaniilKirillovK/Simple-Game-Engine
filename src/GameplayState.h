@@ -5,8 +5,8 @@
 class GameplayState : public IGameState 
 {
 public:
-    GameplayState(IRenderAdapter& renderer, InputHandler& input) 
-    : renderer(renderer), input(input) {};
+    GameplayState(IRenderAdapter& renderer) 
+    : renderer(renderer) {};
 
     virtual void onEnter() override;
     virtual void update(float deltaTime) override;
@@ -16,7 +16,6 @@ private:
     void setupTestScene();
 
     IRenderAdapter& renderer;
-    InputHandler& input;
 
     World world;
 };

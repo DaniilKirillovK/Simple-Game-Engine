@@ -10,6 +10,7 @@
 
 Application::Application()
 {
+    
 }
 
 Application::~Application()
@@ -31,7 +32,7 @@ bool Application::initialize(int width, int height, const std::string& title)
 	TextureLoader::getInstance().registerLoader(renderer.get());
     ShaderLoader::getInstance().registerLoader(renderer.get());
 
-    currentState = std::make_unique<GameplayState>(*renderer, input);
+    currentState = std::make_unique<GameplayState>(*renderer);
     currentState->onEnter();
 
     bindActions();
@@ -66,16 +67,18 @@ void Application::shutdown()
 
 void Application::bindActions()
 {
-    input.bindAction("MoveForward", KeyCode::KEY_W);
-    input.bindAction("MoveBack", KeyCode::KEY_S);
-    input.bindAction("MoveLeft", KeyCode::KEY_A);
-    input.bindAction("MoveRight", KeyCode::KEY_D);
-    input.bindAction("MoveUp", KeyCode::KEY_SPACE);
-    input.bindAction("MoveDown", KeyCode::KEY_LEFT_CONTROL);
+    InputHandler::getInstance().bindAction("MoveForward", KeyCode::KEY_W);
+    InputHandler::getInstance().bindAction("MoveBack", KeyCode::KEY_S);
+    InputHandler::getInstance().bindAction("MoveLeft", KeyCode::KEY_A);
+    InputHandler::getInstance().bindAction("MoveRight", KeyCode::KEY_D);
+    InputHandler::getInstance().bindAction("MoveUp", KeyCode::KEY_SPACE);
+    InputHandler::getInstance().bindAction("MoveDown", KeyCode::KEY_LEFT_CONTROL);
+    InputHandler::getInstance().bindAction("ToggleDebug", KeyCode::KEY_F3);
 }
 
 void Application::handleEvents()
 {
+    InputHandler::getInstance().update();
     renderer->pollEvents();
 
     auto keyEvents = renderer->getKeyEvents();
@@ -83,16 +86,14 @@ void Application::handleEvents()
     auto mouseMoveEvents = renderer->getMouseMoveEvents();
     auto mouseScrollEvents = renderer->getMouseScrollEvents();
 
-    input.processKeyEvents(keyEvents);
-    input.processMouseButtonEvents(mouseButtonEvents);
-    input.processMouseMoveEvents(mouseMoveEvents);
-    input.processMouseScrollEvents(mouseScrollEvents);
+    InputHandler::getInstance().processKeyEvents(keyEvents);
+    InputHandler::getInstance().processMouseButtonEvents(mouseButtonEvents);
+    InputHandler::getInstance().processMouseMoveEvents(mouseMoveEvents);
+    InputHandler::getInstance().processMouseScrollEvents(mouseScrollEvents);
 }
 
 void Application::update(float deltaTime)
 {
-    input.update();
-
     if (currentState) 
     {
         currentState->update(deltaTime);
@@ -103,7 +104,7 @@ void Application::update(float deltaTime)
         }
     }
 
-    input.clearFrameState();
+    InputHandler::getInstance().clearFrameState();
 }
 
 void Application::render()

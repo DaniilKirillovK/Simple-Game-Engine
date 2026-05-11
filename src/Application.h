@@ -27,7 +27,6 @@ private:
 
     std::unique_ptr<IRenderAdapter> renderer;
     std::unique_ptr<IGameState> currentState;
-    InputHandler input;
     bool running = false;
     std::chrono::high_resolution_clock::time_point lastTime;
 };

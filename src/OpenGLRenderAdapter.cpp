@@ -640,7 +640,7 @@ void OpenGLRenderAdapter::flushDebugDraw()
 {
     if (m_debugVertices.empty()) return;
 
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLineWidth(2.0f);
@@ -660,7 +660,6 @@ void OpenGLRenderAdapter::flushDebugDraw()
     glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_debugVertices.size()));
 
     glBindVertexArray(0);
-    glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
 }
 

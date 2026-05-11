@@ -38,7 +38,7 @@ private:
     IRenderAdapter* m_renderer;
 
     glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
-    bool m_debugRendering = false;
+    bool m_debugRendering = true;
 
     float m_fixedTimestep = 1.0f / 120.f;
     float m_accumulator = 0.0f;
@@ -57,3 +57,4 @@ private:
         Rigidbody& rbA, Rigidbody& rbB,
         Transform& transformA, Transform& transformB);
 };
+
