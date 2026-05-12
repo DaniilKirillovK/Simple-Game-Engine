@@ -5,6 +5,9 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include "libs/imgui/imgui.h"
+#include "Entity.h"
+
+class Transform;
 
 struct DebugVertex
 {
@@ -21,7 +24,7 @@ public:
     virtual ~OpenGLRenderAdapter();
 
     virtual bool initialize(int width, int height) override;
-    virtual void render() override;
+    virtual void render(World* world) override;
     virtual void shutdown() override;
     virtual bool shouldClose() const override;
     virtual void compileShaders() override;
@@ -83,8 +86,14 @@ private:
     unsigned int getRenderTexture() const { return m_renderTexture; }
     void resizeRenderTexture(int width, int height);
 
-    void renderUI();
-    void renderUIViewport();
+    void renderUI(World* world);
+    void renderUIViewport(World* world);
+    void renderSceneHierarchy(World* world);
+    void renderInspector(World* world);
+    void renderStatistics(World* world);
+    void renderAboutWindow();
+    void renderTransformEditor(Transform& transform);
+    void renderToolbar(ImVec2 position, ImVec2 size);
     static void SizeCallback(ImGuiSizeCallbackData* data);
 
     bool initGLFW(int width, int height);
@@ -126,11 +135,19 @@ private:
     int m_width;
     int m_height;
 
+    int m_fpsCounter = 0;
+    float m_fpsAccumulator = 0.0f;
+    int m_currentFPS = 0;
+
     unsigned int m_fbo = 0;
     unsigned int m_renderTexture = 0;
     unsigned int m_depthBuffer = 0;
     int m_textureWidth = 0;
     int m_textureHeight = 0;
+    EntityId m_selectedEntity = -1;
+
+    int m_gizmoOperation = 0;
+    bool m_gizmoLocalSpace = false;
 
     // Debug
     unsigned int m_debugVAO = 0;

@@ -17,5 +17,5 @@ private:
 
     IRenderAdapter& renderer;
 
-    World world;
+    World* world;
 };

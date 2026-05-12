@@ -10,6 +10,7 @@ class Mesh;
 class Light;
 struct TextureData;
 struct ShaderProgram;
+class World;
 
 struct Color 
 {
@@ -25,7 +26,7 @@ class IRenderAdapter
 public:
     virtual ~IRenderAdapter() = default;
     virtual bool initialize(int width, int height) = 0;
-    virtual void render() = 0;
+    virtual void render(World* world) = 0;
     virtual void shutdown() = 0;
     virtual bool shouldClose() const = 0;
     virtual void compileShaders() = 0;

@@ -8,8 +8,9 @@
 #include "Components/MeshRenderer.h"
 #include "Components/Material.h"
 #include "Components/Light.h"
+#include "World.h"
 #include "Components/Transform.h"
-#include <glm/gtc/type_ptr.hpp>
+#include "glm/gtc/type_ptr.hpp"
 
 #include "Resources/ShaderLoader/ShaderLoader.h"
 #include "Resources/ShaderLoader/ShaderProgram.h"
@@ -18,6 +19,10 @@
 #include "libs/imgui/imgui.h"
 #include "libs/imgui/backends/imgui_impl_glfw.h"
 #include "libs/imgui/backends/imgui_impl_opengl3.h"
+#include "libs/imgui/imguizmo/ImGuizmo.h"
+#include "Components/Tag.h"
+#include "Components/Rigidbody.h"
+#include "Components/Collider.h"
 
 static const char* debugVertexShaderSource = R"(
     #version 330 core
@@ -92,7 +97,7 @@ bool OpenGLRenderAdapter::initialize(int width, int height)
     return true;
 }
 
-void OpenGLRenderAdapter::render()
+void OpenGLRenderAdapter::render(World* world)
 {
     endRenderToTexture();
 
@@ -102,7 +107,7 @@ void OpenGLRenderAdapter::render()
     beginImGuiFrame();
     ImGui::DockSpaceOverViewport();
 
-    renderUI();
+    renderUI(world);
     
     endImGuiFrame();
     glfwSwapBuffers(m_window);
@@ -262,11 +267,13 @@ void OpenGLRenderAdapter::destroyTexture(uint32_t handle)
 void OpenGLRenderAdapter::initImGui()
 {
     IMGUI_CHECKVERSION();
+
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
 
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ImGui::StyleColorsDark();
 
@@ -281,12 +288,20 @@ void OpenGLRenderAdapter::beginImGuiFrame()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
 }
 
 void OpenGLRenderAdapter::endImGuiFrame()
 {
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+    }
 }
 
 void OpenGLRenderAdapter::shutdownImGui()
@@ -603,57 +618,342 @@ void OpenGLRenderAdapter::resizeRenderTexture(int width, int height)
     createRenderTexture(width, height);
 }
 
-void OpenGLRenderAdapter::renderUI()
+void OpenGLRenderAdapter::renderUI(World* world)
 {
-    renderUIViewport();
-
-    if (ImGui::Begin("My Window"))
-    {
-        ImGui::Text("Hello, Engine!");
-        ImGui::Button("Click");
-    }
-    ImGui::End();
+    renderUIViewport(world);
+    renderSceneHierarchy(world);
+    renderInspector(world);
+    renderStatistics(world);
 }
 
-void OpenGLRenderAdapter::renderUIViewport()
+void OpenGLRenderAdapter::renderUIViewport(World* world)
 {
     float aspectRatio = 16.0f / 9.0f;
-    ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::Begin("Viewport", nullptr, 
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoScrollbar);
 
     m_viewportSize = ImGui::GetContentRegionAvail();
     m_viewportHovered = ImGui::IsWindowHovered();
 
+    ImVec2 imagePos = ImGui::GetCursorScreenPos();
+    ImVec2 imageSize;
+
     if (m_renderTexture != 0 && m_viewportSize.x > 0 && m_viewportSize.y > 0)
     {
         float targetWidth = m_viewportSize.y * aspectRatio;
-        ImVec2 imageSize;
 
         if (targetWidth <= m_viewportSize.x)
         {
             imageSize = ImVec2(targetWidth, m_viewportSize.y);
             float offsetX = (m_viewportSize.x - targetWidth) * 0.5f;
+            imagePos.x += offsetX;
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
         }
         else
         {
             imageSize = ImVec2(m_viewportSize.x, m_viewportSize.x / aspectRatio);
             float offsetY = (m_viewportSize.y - imageSize.y) * 0.5f;
+            imagePos.y += offsetY;
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
         }
 
         ImGui::Image((ImTextureID)(intptr_t)m_renderTexture, imageSize,
             ImVec2(0, 1),
             ImVec2(1, 0));
+
+        ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+        ImGuizmo::SetRect(imagePos.x, imagePos.y, imageSize.x, imageSize.y);
+
+        if (m_selectedEntity != -1 && world)
+        {
+            Transform* entityTransform = world->getComponent<Transform>(m_selectedEntity);
+            if (entityTransform)
+            {
+                glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), entityTransform->position);
+                modelMatrix *= glm::mat4_cast(entityTransform->rotation);
+                modelMatrix = glm::scale(modelMatrix, entityTransform->scale);
+
+                ImGuizmo::OPERATION op = (m_gizmoOperation == 0 ? ImGuizmo::TRANSLATE : (m_gizmoOperation == 1 ? ImGuizmo::ROTATE : ImGuizmo::SCALE));
+                ImGuizmo::MODE mode = m_gizmoLocalSpace ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+
+                ImGuizmo::Manipulate(glm::value_ptr(currentViewMatrix),
+                    glm::value_ptr(currentProjectionMatrix),
+                    op, mode,
+                    glm::value_ptr(modelMatrix));
+
+                if (ImGuizmo::IsUsing())
+                {
+                    glm::vec3 newPosition, newScale;
+                    glm::quat newRotation;
+                    ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(modelMatrix),
+                        glm::value_ptr(newPosition),
+                        glm::value_ptr(newRotation),
+                        glm::value_ptr(newScale));
+
+                    entityTransform->position = newPosition;
+                    entityTransform->rotation = newRotation;
+                    entityTransform->scale = newScale;
+                }
+            }
+        }
+
+        ImVec2 toolbarPos = ImGui::GetWindowPos();
+        ImVec2 toolbarSize = ImGui::GetContentRegionAvail();
+        renderToolbar(toolbarPos, toolbarSize);
+    }
+
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderSceneHierarchy(World* world)
+{
+    ImGui::Begin("Scene Hierarchy");
+
+    auto& transforms = world->getComponentPool<Transform>();
+
+    for (auto& [entity, transform] : transforms.getAll())
+    {
+        std::string entityName = "Entity " + std::to_string(entity);
+
+        if (world->hasComponent<Tag>(entity))
+        {
+            Tag* tag = world->getComponent<Tag>(entity);
+            if (tag && !tag->name.empty())
+            {
+                entityName = tag->name;
+            }
+        }
+
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf;
+        if (m_selectedEntity == entity)
+        {
+            flags |= ImGuiTreeNodeFlags_Selected;
+        }
+
+        if (ImGui::Selectable(entityName.c_str(), m_selectedEntity == entity))
+        {
+            m_selectedEntity = entity;
+        }
+
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("ID: %d", entity);
+        }
+    }
+
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderInspector(World* world)
+{
+    ImGui::Begin("Inspector");
+
+    if (m_selectedEntity == -1)
+    {
+        ImGui::Text("No entity selected");
+        ImGui::End();
+        return;
+    }
+
+    ImGui::Text("Entity ID: %d", m_selectedEntity);
+    ImGui::SameLine();
+
+    ImGui::Separator();
+
+    if (Transform* transform = world->getComponent<Transform>(m_selectedEntity))
+    {
+        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            renderTransformEditor(*transform);
+        }
+    }
+
+    if (Tag* tag = world->getComponent<Tag>(m_selectedEntity))
+    {
+        if (ImGui::CollapsingHeader("Tag", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            char nameBuffer[256];
+            strncpy(nameBuffer, tag->name.c_str(), sizeof(nameBuffer));
+            if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
+            {
+                tag->name = nameBuffer;
+            }
+        }
     }
     else
     {
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        ImVec2 pos = ImGui::GetCursorScreenPos();
-        draw->AddRectFilled(pos, ImVec2(pos.x + m_viewportSize.x, pos.y + m_viewportSize.y),
-            IM_COL32(50, 50, 80, 255));
-        draw->AddText(pos, IM_COL32(255, 255, 255, 255), "Loading...");
+        if (ImGui::CollapsingHeader("+ Add Component"))
+        {
+            if (ImGui::MenuItem("Add Tag"))
+            {
+                world->addComponent<Tag>(m_selectedEntity, Tag{});
+            }
+        }
     }
 
+    if (MeshRenderer* meshRenderer = world->getComponent<MeshRenderer>(m_selectedEntity))
+    {
+        if (ImGui::CollapsingHeader("Mesh Renderer"))
+        {
+            ImGui::Checkbox("Visible", &meshRenderer->visible);
+        }
+    }
+
+    if (Rigidbody* rb = world->getComponent<Rigidbody>(m_selectedEntity))
+    {
+        if (ImGui::CollapsingHeader("Rigidbody"))
+        {
+            ImGui::Checkbox("Use Gravity", &rb->useGravity);
+            ImGui::Checkbox("Is Kinematic", &rb->isKinematic);
+            ImGui::DragFloat("Mass", &rb->mass, 0.1f, 0.01f, 1000.0f);
+            if (ImGui::IsItemEdited()) rb->updateInvMass();
+            ImGui::Text("Velocity: %.2f, %.2f, %.2f", rb->velocity.x, rb->velocity.y, rb->velocity.z);
+        }
+    }
+
+    if (Collider* collider = world->getComponent<Collider>(m_selectedEntity))
+    {
+        if (ImGui::CollapsingHeader("Collider"))
+        {
+            const char* types[] = { "Box", "Sphere" };
+            int currentType = (int)collider->type;
+            if (ImGui::Combo("Type", &currentType, types, 2))
+            {
+                collider->type = (ColliderType)currentType;
+            }
+
+            if (collider->type == ColliderType::Box)
+            {
+                ImGui::DragFloat3("Half Size", glm::value_ptr(collider->halfSize), 0.1f);
+            }
+            else
+            {
+                ImGui::DragFloat("Radius", &collider->radius, 0.1f);
+            }
+
+            ImGui::DragFloat3("Offset", glm::value_ptr(collider->offset), 0.1f);
+            ImGui::DragFloat("Bounciness", &collider->bounciness, 0.01f, 0.0f, 1.0f);
+            ImGui::Checkbox("Is Trigger", &collider->isTrigger);
+        }
+    }
+
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderStatistics(World* world)
+{
+    ImGui::Begin("Statistics");
+
+    static float fpsHistory[100] = { 0 };
+    static int fpsIndex = 0;
+
+    float deltaTime = world->getCurrentDeltaTime();
+
+    m_fpsCounter++;
+    m_fpsAccumulator += deltaTime;
+    if (m_fpsAccumulator >= 1.0f)
+    {
+        m_currentFPS = m_fpsCounter;
+        m_fpsCounter = 0;
+        m_fpsAccumulator = 0.0f;
+
+        fpsHistory[fpsIndex] = m_currentFPS;
+        fpsIndex = (fpsIndex + 1) % 100;
+    }
+
+    ImGui::Text("FPS: %d", m_currentFPS);
+    ImGui::Text("Frame Time: %.2f ms", deltaTime * 1000.0f);
+
+    ImGui::Separator();
+    if (world)
+    {
+        int totalEntities = 0;
+        int meshRenderersCount = 0;
+        int rigidbodiesCount = 0;
+
+        auto& transforms = world->getComponentPool<Transform>();
+        totalEntities = transforms.getAll().size();
+
+        auto& meshRenderers = world->getComponentPool<MeshRenderer>();
+        meshRenderersCount = meshRenderers.getAll().size();
+
+        auto& rigidbodies = world->getComponentPool<Rigidbody>();
+        rigidbodiesCount = rigidbodies.getAll().size();
+
+        ImGui::Text("Total Entities: %d", totalEntities);
+        ImGui::Text("Mesh Renderers: %d", meshRenderersCount);
+        ImGui::Text("Rigidbodies: %d", rigidbodiesCount);
+    }
+
+    ImGui::Separator();
+
+    ImGui::Text("FPS History:");
+    ImGui::PlotLines("##FPS", fpsHistory, 100, fpsIndex, nullptr, 0.0f, 120.0f, ImVec2(0, 60));
+
+    ImGui::Separator();
+
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderAboutWindow()
+{
+}
+
+void OpenGLRenderAdapter::renderTransformEditor(Transform& transform)
+{
+    ImGui::DragFloat3("Position", glm::value_ptr(transform.position), 0.1f);
+
+    glm::vec3 rotation = glm::degrees(glm::eulerAngles(transform.rotation));
+    if (ImGui::DragFloat3("Rotation", glm::value_ptr(rotation), 1.0f))
+    {
+        transform.rotation = glm::quat(glm::radians(rotation));
+    }
+
+    ImGui::DragFloat3("Scale", glm::value_ptr(transform.scale), 0.1f, 0.01f);
+}
+
+void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
+{
+    ImGui::SetNextWindowPos(ImVec2(position.x, position.y + 20));
+    ImGui::SetNextWindowSize(ImVec2(size.x, 40));
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoCollapse;
+
+    if (ImGui::Begin("Toolbar", nullptr, flags))
+    {
+        ImGui::SameLine(10);
+
+        if (ImGui::RadioButton("Move", m_gizmoOperation == 0))
+        {
+            m_gizmoOperation = 0;
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::RadioButton("Rotate", m_gizmoOperation == 1))
+        {
+            m_gizmoOperation = 1;
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::RadioButton("Scale", m_gizmoOperation == 2))
+        {
+            m_gizmoOperation = 2;
+        }
+
+        ImGui::SameLine(200);
+        ImGui::Checkbox("Local", &m_gizmoLocalSpace);
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+    }
     ImGui::End();
 }
 

@@ -28,14 +28,16 @@ public:
 
 	template<typename T>
 	std::vector<std::pair<EntityId, T*>> getEntitiesWithComponent();
+	template<typename T>
+	ComponentPool<T>& getComponentPool();
+
+	float getCurrentDeltaTime() { return m_currentDeltaTime; }
 
 	void addSystem(std::unique_ptr<ISystem> system);
 	void update(float deltaTime);
 
 private:
-	template<typename T>
-	ComponentPool<T>& getComponentPool();
-
+	float m_currentDeltaTime;
 	EntityId nextEntityId;
 	std::unordered_set<EntityId> entities;
 	std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>> componentPools;
@@ -133,6 +135,7 @@ inline void World::addSystem(std::unique_ptr<ISystem> system)
 
 inline void World::update(float deltaTime)
 {
+	m_currentDeltaTime = deltaTime;
 	for (std::unique_ptr<ISystem>& system : systems)
 	{
 		system->update(*this, deltaTime);

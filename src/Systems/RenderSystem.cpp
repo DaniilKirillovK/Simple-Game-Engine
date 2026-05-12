@@ -57,25 +57,26 @@ void RenderSystem::update(World& world, float deltaTime)
 
     for (auto& [entity, renderer] : renderers) 
     {
-        if (!renderer->visible) return;
-        if (!renderer->mesh || !renderer->material) return;
+        if (renderer->visible && renderer->mesh && renderer->material)
+        {
+            Transform* transform = world.getComponent<Transform>(entity);
+            if (transform)
+            {
+                glm::mat4 modelMatrix = transform->getLocalMatrix();
+                glm::mat4 mvpMatrix = projectionMatrix * viewMatrix * modelMatrix;
+                glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
 
-        Transform* transform = world.getComponent<Transform>(entity);
-        if (!transform) return;
+                renderAdapter->setShaderProgram(renderer->material->shaderProgram);
 
-        glm::mat4 modelMatrix = transform->getLocalMatrix();
-        glm::mat4 mvpMatrix = projectionMatrix * viewMatrix * modelMatrix;
-        glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
+                renderAdapter->setModelMatrix(glm::value_ptr(modelMatrix));
+                renderAdapter->setViewMatrix(glm::value_ptr(viewMatrix));
+                renderAdapter->setProjectionMatrix(glm::value_ptr(projectionMatrix));
+                renderAdapter->setNormalMatrix(glm::value_ptr(normalMatrix));
 
-        renderAdapter->setShaderProgram(renderer->material->shaderProgram);
-
-        renderAdapter->setModelMatrix(glm::value_ptr(modelMatrix));
-        renderAdapter->setViewMatrix(glm::value_ptr(viewMatrix));
-        renderAdapter->setProjectionMatrix(glm::value_ptr(projectionMatrix));
-        renderAdapter->setNormalMatrix(glm::value_ptr(normalMatrix));
-
-        renderAdapter->setLights(lights);
-        renderAdapter->setMaterial(renderer->material);
-        renderAdapter->drawMesh(renderer->mesh);
+                renderAdapter->setLights(lights);
+                renderAdapter->setMaterial(renderer->material);
+                renderAdapter->drawMesh(renderer->mesh);
+            }
+        }
     }
 }
