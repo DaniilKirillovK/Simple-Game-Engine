@@ -12,7 +12,6 @@
 #include "Components/Transform.h"
 #include "glm/gtc/type_ptr.hpp"
 
-#include "Resources/ShaderLoader/ShaderLoader.h"
 #include "Resources/ShaderLoader/ShaderProgram.h"
 #include "Resources/TextureLoader/Texture.h"
 #include "Common/KeyCode.h"
@@ -23,6 +22,8 @@
 #include "Components/Tag.h"
 #include "Components/Rigidbody.h"
 #include "Components/Collider.h"
+
+#include "Utils/HierarchyUtils.h"
 
 static const char* debugVertexShaderSource = R"(
     #version 330 core
@@ -670,13 +671,17 @@ void OpenGLRenderAdapter::renderUIViewport(World* world)
         if (m_selectedEntity != -1 && world)
         {
             Transform* entityTransform = world->getComponent<Transform>(m_selectedEntity);
+            EntityId parentId = HierarchyUtils::getParent(world, m_selectedEntity);
+            Transform* parentTransform = (parentId != -1) ? world->getComponent<Transform>(parentId) : nullptr;
+
             if (entityTransform)
             {
-                glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), entityTransform->position);
+                glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), entityTransform->getWorldPosition());
                 modelMatrix *= glm::mat4_cast(entityTransform->rotation);
                 modelMatrix = glm::scale(modelMatrix, entityTransform->scale);
 
-                ImGuizmo::OPERATION op = (m_gizmoOperation == 0 ? ImGuizmo::TRANSLATE : (m_gizmoOperation == 1 ? ImGuizmo::ROTATE : ImGuizmo::SCALE));
+                ImGuizmo::OPERATION op = (m_gizmoOperation == 0 ? ImGuizmo::TRANSLATE :
+                    (m_gizmoOperation == 1 ? ImGuizmo::ROTATE : ImGuizmo::SCALE));
                 ImGuizmo::MODE mode = m_gizmoLocalSpace ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
 
                 ImGuizmo::Manipulate(glm::value_ptr(currentViewMatrix),
@@ -686,16 +691,45 @@ void OpenGLRenderAdapter::renderUIViewport(World* world)
 
                 if (ImGuizmo::IsUsing())
                 {
-                    glm::vec3 newPosition, newScale;
-                    glm::quat newRotation;
+                    glm::vec3 newWorldPosition, newScale;
+                    float rotationEuler[3];
                     ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(modelMatrix),
-                        glm::value_ptr(newPosition),
-                        glm::value_ptr(newRotation),
+                        glm::value_ptr(newWorldPosition),
+                        rotationEuler,
                         glm::value_ptr(newScale));
+                    glm::vec3 eulerRadians = glm::radians(glm::vec3(rotationEuler[0], rotationEuler[1], rotationEuler[2]));
+                    glm::quat newWorldRotation = glm::quat(eulerRadians);
 
-                    entityTransform->position = newPosition;
-                    entityTransform->rotation = newRotation;
-                    entityTransform->scale = newScale;
+                    if (parentTransform)
+                    {
+                        glm::mat4 parentWorldMatrix = parentTransform->worldMatrix;
+
+                        glm::mat4 inverseParentMatrix = glm::inverse(parentWorldMatrix);
+
+                        glm::vec4 localPos4 = inverseParentMatrix * glm::vec4(newWorldPosition, 1.0f);
+                        glm::vec3 newLocalPosition = glm::vec3(localPos4);
+
+                        glm::quat parentWorldRotation = glm::quat_cast(parentWorldMatrix);
+                        glm::quat inverseParentRotation = glm::inverse(parentWorldRotation);
+                        glm::quat newLocalRotation = inverseParentRotation * newWorldRotation;
+
+                        glm::vec3 parentScale = parentTransform->scale;
+                        glm::vec3 newLocalScale = newScale;
+
+                        entityTransform->position = newLocalPosition;
+                        entityTransform->rotation = newLocalRotation;
+                        entityTransform->scale = newLocalScale;
+                    }
+                    else if (newWorldPosition.length() > 0.5f)
+                    {
+                        entityTransform->position = newWorldPosition;
+                        entityTransform->rotation = newWorldRotation;
+                        entityTransform->scale = newScale;
+                    }
+
+                    entityTransform->markDirty();
+
+                    HierarchyUtils::markChildrenDirty(world, m_selectedEntity);
                 }
             }
         }
@@ -712,36 +746,36 @@ void OpenGLRenderAdapter::renderSceneHierarchy(World* world)
 {
     ImGui::Begin("Scene Hierarchy");
 
+    if (!world) {
+        ImGui::End();
+        return;
+    }
+
     auto& transforms = world->getComponentPool<Transform>();
+    auto& hierarchies = world->getComponentPool<Hierarchy>();
+
+    std::vector<EntityId> rootEntities;
 
     for (auto& [entity, transform] : transforms.getAll())
     {
-        std::string entityName = "Entity " + std::to_string(entity);
-
-        if (world->hasComponent<Tag>(entity))
+        bool hasParent = false;
+        if (hierarchies.hasComponent(entity))
         {
-            Tag* tag = world->getComponent<Tag>(entity);
-            if (tag && !tag->name.empty())
+            Hierarchy* hierarchy = hierarchies.getComponent(entity);
+            if (hierarchy->parent != -1 && transforms.hasComponent(hierarchy->parent))
             {
-                entityName = tag->name;
+                hasParent = true;
             }
         }
-
-        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf;
-        if (m_selectedEntity == entity)
+        if (!hasParent)
         {
-            flags |= ImGuiTreeNodeFlags_Selected;
+            rootEntities.push_back(entity);
         }
+    }
 
-        if (ImGui::Selectable(entityName.c_str(), m_selectedEntity == entity))
-        {
-            m_selectedEntity = entity;
-        }
-
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::SetTooltip("ID: %d", entity);
-        }
+    for (EntityId root : rootEntities)
+    {
+        renderHierarchyNode(world, hierarchies, transforms, root, 0);
     }
 
     ImGui::End();
@@ -962,6 +996,86 @@ void OpenGLRenderAdapter::SizeCallback(ImGuiSizeCallbackData* data)
     float aspectRatio = *(float*)data->UserData;
     float newHeight = data->DesiredSize.x / aspectRatio;
     data->DesiredSize.y = newHeight;
+}
+
+void OpenGLRenderAdapter::renderHierarchyNode(World* world, ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth)
+{
+    std::string entityName = "Entity " + std::to_string(entity);
+    if (world->hasComponent<Tag>(entity))
+    {
+        Tag* tag = world->getComponent<Tag>(entity);
+        if (tag && !tag->name.empty())
+        {
+            entityName = tag->name;
+        }
+    }
+
+    std::string displayName = "";
+    for (int i = 0; i < depth; i++)
+    {
+        displayName += "  ";
+    }
+    displayName += entityName;
+
+    bool hasChildren = false;
+    std::vector<EntityId> children;
+
+    if (hierarchies.hasComponent(entity))
+    {
+        Hierarchy* hierarchy = hierarchies.getComponent(entity);
+        children = hierarchy->children;
+        hasChildren = !children.empty();
+    }
+
+    ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow;
+    if (!hasChildren)
+    {
+        nodeFlags |= ImGuiTreeNodeFlags_Leaf;
+    }
+    if (m_selectedEntity == entity)
+    {
+        nodeFlags |= ImGuiTreeNodeFlags_Selected;
+    }
+
+    ImGui::PushID(entity);
+
+    bool isOpen = false;
+
+    if (hasChildren)
+    {
+        isOpen = ImGui::TreeNodeEx(displayName.c_str(), nodeFlags);
+    }
+    else
+    {
+        if (ImGui::Selectable(displayName.c_str(), m_selectedEntity == entity))
+        {
+            m_selectedEntity = entity;
+        }
+
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("ID: %d", entity);
+        }
+    }
+
+    if (ImGui::IsItemClicked())
+    {
+        m_selectedEntity = entity;
+    }
+
+    if (hasChildren && isOpen)
+    {
+        for (EntityId child : children)
+        {
+            if (transforms.hasComponent(child))
+            {
+                renderHierarchyNode(world, hierarchies, transforms, child, depth + 1);
+            }
+        }
+        ImGui::TreePop();
+    }
+
+    ImGui::PopID();
 }
 
 bool OpenGLRenderAdapter::initGLFW(int width, int height)

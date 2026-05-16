@@ -128,8 +128,8 @@ void PhysicsSystem::renderDebugColliders(World& world)
             const Transform* transform = world.getComponent<Transform>(entity);
             if (transform) 
             {
-                glm::vec3 worldMin = collider->getWorldMin(transform->position);
-                glm::vec3 worldMax = collider->getWorldMax(transform->position);
+                glm::vec3 worldMin = collider->getWorldMin(transform->getWorldPosition());
+                glm::vec3 worldMax = collider->getWorldMax(transform->getWorldPosition());
 
                 glm::vec4 color = collider->isTrigger
                     ? glm::vec4(1.0f, 1.0f, 0.0f, 0.5f)
@@ -141,7 +141,7 @@ void PhysicsSystem::renderDebugColliders(World& world)
                 }
                 else if (collider->type == ColliderType::Sphere)
                 {
-                    m_renderer->drawDebugSphere(transform->position, collider->radius + 0.05f, color);
+                    m_renderer->drawDebugSphere(transform->getWorldPosition(), collider->radius + 0.05f, color);
                 }
             }
         }
@@ -154,10 +154,10 @@ bool PhysicsSystem::checkCollision(const Collider& a, const Transform& transform
 {
     if (a.type == ColliderType::Box && b.type == ColliderType::Box) 
     {
-        glm::vec3 minA = a.getWorldMin(transformA.position);
-        glm::vec3 maxA = a.getWorldMax(transformA.position);
-        glm::vec3 minB = b.getWorldMin(transformB.position);
-        glm::vec3 maxB = b.getWorldMax(transformB.position);
+        glm::vec3 minA = a.getWorldMin(transformA.getWorldPosition());
+        glm::vec3 maxA = a.getWorldMax(transformA.getWorldPosition());
+        glm::vec3 minB = b.getWorldMin(transformB.getWorldPosition());
+        glm::vec3 maxB = b.getWorldMax(transformB.getWorldPosition());
 
         if (maxA.x < minB.x || minA.x > maxB.x) return false;
         if (maxA.y < minB.y || minA.y > maxB.y) return false;
@@ -196,8 +196,8 @@ bool PhysicsSystem::checkCollision(const Collider& a, const Transform& transform
     // Sphere vs Sphere
     if (a.type == ColliderType::Sphere && b.type == ColliderType::Sphere) 
     {
-        glm::vec3 centerA = a.getCenter(transformA.position);
-        glm::vec3 centerB = b.getCenter(transformB.position);
+        glm::vec3 centerA = a.getCenter(transformA.getWorldPosition());
+        glm::vec3 centerB = b.getCenter(transformB.getWorldPosition());
         glm::vec3 delta = centerB - centerA;
         float distance = glm::length(delta);
         float radiusSum = a.radius + b.radius;

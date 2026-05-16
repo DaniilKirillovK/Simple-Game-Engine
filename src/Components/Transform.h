@@ -15,6 +15,9 @@ public:
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 scale = glm::vec3(1.0f);
 
+    glm::mat4 worldMatrix = glm::mat4(1.0f);
+    bool worldMatrixDirty = true;
+
     glm::vec3 eulerRotation = glm::vec3(0.0f);
 
     glm::mat4 getLocalMatrix() const 
@@ -24,6 +27,25 @@ public:
         matrix = matrix * glm::mat4x4(rotation);
         matrix = glm::scale(matrix, scale);
         return matrix;
+    }
+
+    void markDirty() 
+    {
+        worldMatrixDirty = true;
+    }
+
+    glm::vec3 getWorldPosition() const 
+    {
+        return glm::vec3(worldMatrix[3]);
+    }
+
+    void updateWorldMatrix(const glm::mat4& parentWorldMatrix)
+    {
+        if (worldMatrixDirty) 
+        {
+            worldMatrix = parentWorldMatrix * getLocalMatrix();
+            worldMatrixDirty = false;
+        }
     }
 
     void updateQuaternion() 

@@ -55,19 +55,17 @@ void RenderSystem::update(World& world, float deltaTime)
 
     auto renderers = world.getEntitiesWithComponent<MeshRenderer>();
 
-    for (auto& [entity, renderer] : renderers) 
+    for (auto& [entity, renderer] : renderers)
     {
         if (renderer->visible && renderer->mesh && renderer->material)
         {
             Transform* transform = world.getComponent<Transform>(entity);
             if (transform)
             {
-                glm::mat4 modelMatrix = transform->getLocalMatrix();
-                glm::mat4 mvpMatrix = projectionMatrix * viewMatrix * modelMatrix;
+                glm::mat4 modelMatrix = transform->worldMatrix;
                 glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
 
                 renderAdapter->setShaderProgram(renderer->material->shaderProgram);
-
                 renderAdapter->setModelMatrix(glm::value_ptr(modelMatrix));
                 renderAdapter->setViewMatrix(glm::value_ptr(viewMatrix));
                 renderAdapter->setProjectionMatrix(glm::value_ptr(projectionMatrix));

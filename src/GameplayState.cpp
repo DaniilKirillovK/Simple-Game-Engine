@@ -6,6 +6,7 @@
 #include "Systems/MovementSystem.h"
 #include "Systems/CameraSystem.h"
 #include "Systems/PhysicsSystem.h"
+#include "Systems/TransformSystem.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -22,9 +23,13 @@
 #include "Components/Camera.h"
 #include "Components/Light.h"
 
+#include "Utils/HierarchyUtils.h"
+
 void GameplayState::onEnter()
 {
     world = new World();
+
+    world->addSystem(std::make_unique<TransformSystem>());
     world->addSystem(std::make_unique<PhysicsSystem>(&renderer));
 	world->addSystem(std::make_unique<RenderSystem>(&renderer));
 	world->addSystem(std::make_unique<CameraSystem>());
@@ -171,7 +176,7 @@ void GameplayState::setupTestScene()
     world->addComponent<Transform>(redSphere, Transform{
         glm::vec3(-2.6f, 10.f, 0.0f),
         glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        glm::vec3(3.0f, 3.0f, 3.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
     world->addComponent<MeshRenderer>(redSphere, MeshRenderer{ sphereMesh, redMaterial });
@@ -180,14 +185,16 @@ void GameplayState::setupTestScene()
 
     EntityId greenSphere = world->createEntity();
     world->addComponent<Transform>(greenSphere, Transform{
-        glm::vec3(1.0f, 15.f, 0.0f),
+        glm::vec3(1.0f, 1.0f, 0.0f),
         glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        glm::vec3(2.0f, 2.0f, 2.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f)
         });
     world->addComponent<MeshRenderer>(greenSphere, MeshRenderer{ sphereMesh, greenMaterial });
     world->addComponent<Rigidbody>(greenSphere, Rigidbody{ 2.0f, false, true });
     world->addComponent<Collider>(greenSphere, Collider{ 1.0f });
+
+    HierarchyUtils::setParent(world, greenSphere, redSphere);
 
     EntityId blueSphere = world->createEntity();
     world->addComponent<Transform>(blueSphere, Transform{

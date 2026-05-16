@@ -6,8 +6,10 @@
 #include <glm/glm.hpp>
 #include "libs/imgui/imgui.h"
 #include "Entity.h"
+#include "ComponentPool.h"
 
 class Transform;
+class Hierarchy;
 
 struct DebugVertex
 {
@@ -95,6 +97,8 @@ private:
     void renderTransformEditor(Transform& transform);
     void renderToolbar(ImVec2 position, ImVec2 size);
     static void SizeCallback(ImGuiSizeCallbackData* data);
+
+    void renderHierarchyNode(World* world, ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth);
 
     bool initGLFW(int width, int height);
     bool initGLAD();
