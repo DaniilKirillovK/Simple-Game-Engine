@@ -61,7 +61,6 @@ std::unique_ptr<Mesh> MeshLoader::processMesh(struct aiMesh* mesh)
     auto result = std::make_unique<Mesh>();
     result->type = MeshType::Custom;
 
-
     result->vertices.reserve(mesh->mNumVertices);
     result->normals.reserve(mesh->mNumVertices);
     result->texCoords.reserve(mesh->mNumVertices);
@@ -201,6 +200,7 @@ std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
 
         mergedMesh->vertexCount = mergedMesh->vertices.size();
         mergedMesh->indexCount = mergedMesh->indices.size();
+        mergedMesh->path = filepath;
 
         LOG_INFO(std::string("Merged ") + std::to_string(meshes.size()) + " meshes into: " +
                  std::to_string(mergedMesh->vertexCount) + " vertices, " +

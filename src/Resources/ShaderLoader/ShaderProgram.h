@@ -43,6 +43,7 @@ struct UniformLocations
 struct Shader
 {
     uint32_t shaderId = 0;
+    std::string shaderPath = "";
     ShaderType shaderType = ShaderType::None;
 };
 

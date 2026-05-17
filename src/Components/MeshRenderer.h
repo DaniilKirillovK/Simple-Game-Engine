@@ -19,6 +19,8 @@ struct Mesh
     std::vector<glm::vec2> texCoords;
     std::vector<unsigned int> indices;
 
+    std::string path;
+
     // OpenGL buffers
     unsigned int VAO = 0;
     unsigned int VBO = 0;

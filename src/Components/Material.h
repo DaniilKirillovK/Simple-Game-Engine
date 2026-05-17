@@ -15,6 +15,9 @@ public:
     {
         shaderProgram = new ShaderProgram();
         shaderProgram->programId = renderAdapter.linkShaderProgram(vertexShader->shaderId, fragmentShader->shaderId);
+
+        vertexShaderPath = vertexShader->shaderPath;
+        fragmentShaderPath = fragmentShader->shaderPath;
         
         UniformLocations uniforms;
         uniforms.modelMatrix = glGetUniformLocation(shaderProgram->programId, "uModelMatrix");
@@ -58,10 +61,11 @@ public:
     Texture* diffuseTexture = nullptr;
     Texture* specularTexture = nullptr;
 
+    std::string vertexShaderPath = "";
+    std::string fragmentShaderPath = "";
+
     ShaderProgram* shaderProgram = nullptr;
 
     // Textures
-    unsigned int diffuseTextureId = 0;
-    unsigned int specularTextureId = 0;
     bool hasTexture = false;
 };
