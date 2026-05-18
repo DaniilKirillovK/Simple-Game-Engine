@@ -5,7 +5,14 @@
 
 void TransformSystem::update(World& world, float deltaTime)
 {
+    if (!m_isEnabled) return;
+
     updateWorldMatrices(world);
+}
+
+void TransformSystem::setEnabled(bool isEnabled)
+{
+    m_isEnabled = isEnabled;
 }
 
 void TransformSystem::updateWorldMatrices(World& world)

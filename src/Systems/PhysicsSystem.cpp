@@ -23,6 +23,13 @@ PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
 
 void PhysicsSystem::update(World& world, float deltaTime)
 {
+    if (m_debugRendering && m_renderer)
+    {
+        renderDebugColliders(world);
+    }
+
+    if (!m_isEnabled) return;
+
     std::vector<EntityId> entities;
 
     auto rigidbodyEntities = world.getEntitiesWithComponent<Rigidbody>();
@@ -52,10 +59,11 @@ void PhysicsSystem::update(World& world, float deltaTime)
     //{
     //    toggleDebugRendering();
     //}
-    if (m_debugRendering && m_renderer)
-    {
-        renderDebugColliders(world);
-    }
+}
+
+void PhysicsSystem::setEnabled(bool isEnabled)
+{
+    m_isEnabled = isEnabled;
 }
 
 void PhysicsSystem::applyGravity(World& world, std::vector<EntityId>& entities, float dt)

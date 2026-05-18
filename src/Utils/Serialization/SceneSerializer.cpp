@@ -280,7 +280,7 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         }
     }
 
-    LOG_INFO("Scene loaded, entities: %d", world.getComponentPool<Transform>().getAll().size());
+    LOG_INFO("Scene loaded, entities: " + std::to_string(world.getComponentPool<Transform>().getAll().size()));
 }
 
 nlohmann::json SceneSerializer::serializeTransform(const Transform& transform)
@@ -453,6 +453,10 @@ nlohmann::json SceneSerializer::serializeHierarchy(const Hierarchy& hierarchy)
 nlohmann::json SceneSerializer::serializeCamera(const Camera& camera)
 {
     nlohmann::json j;
+    j["forward"] = { camera.forward.x, camera.forward.y, camera.forward.z };
+    j["up"] = { camera.up.x, camera.up.y, camera.up.z };
+    j["right"] = { camera.right.x, camera.right.y, camera.right.z };
+
     j["fov"] = camera.fov;
     j["aspect_ratio"] = camera.aspectRatio;
     j["near_plane"] = camera.nearPlane;
@@ -675,6 +679,19 @@ void SceneSerializer::deserializeHierarchy(Hierarchy& hierarchy, const nlohmann:
 
 void SceneSerializer::deserializeCamera(Camera& camera, const nlohmann::json& j)
 {
+    if (j.contains("forward"))
+    {
+        camera.forward = glm::vec3(j["forward"][0], j["forward"][1], j["forward"][2]);
+    }
+    if (j.contains("up"))
+    {
+        camera.up = glm::vec3(j["up"][0], j["up"][1], j["up"][2]);
+    }
+    if (j.contains("right"))
+    {
+        camera.right = glm::vec3(j["right"][0], j["right"][1], j["right"][2]);
+    }
+
     if (j.contains("fov")) camera.fov = j["fov"].get<float>();
     if (j.contains("aspect_ratio")) camera.aspectRatio = j["aspect_ratio"].get<float>();
     if (j.contains("near_plane")) camera.nearPlane = j["near_plane"].get<float>();

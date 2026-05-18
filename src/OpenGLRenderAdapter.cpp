@@ -1205,6 +1205,26 @@ void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
     if (ImGui::Begin("Toolbar", nullptr, flags))
     {
         ImGui::SameLine(10);
+        if (!m_isPlaying)
+        {
+            if (ImGui::Button("Play"))
+            {
+                m_isPlaying = true;
+                if (m_onPlayCallback) m_onPlayCallback();
+            }
+        }
+        else
+        {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+            if (ImGui::Button("Stop"))
+            {
+                m_isPlaying = false;
+                if (m_onStopCallback) m_onStopCallback();
+            }
+            ImGui::PopStyleColor();
+        }
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - 500);
 
         if (ImGui::RadioButton("Move", m_gizmoOperation == 0))
         {
@@ -1225,10 +1245,10 @@ void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
             m_gizmoOperation = 2;
         }
 
-        ImGui::SameLine(200);
+        ImGui::SameLine();
         ImGui::Checkbox("Local", &m_gizmoLocalSpace);
 
-        ImGui::SameLine(300);
+        ImGui::SameLine(ImGui::GetWindowWidth() - 150);
 
         if (ImGui::Checkbox("Debug Colliders", &m_showDebugColliders))
         {
@@ -1237,9 +1257,6 @@ void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
                 m_onToggleDebugCallback(m_showDebugColliders);
             }
         }
-
-        ImGui::SameLine();
-        ImGui::TextDisabled("(F3)");
     }
     ImGui::End();
 }

@@ -81,4 +81,6 @@ public:
 
     // Callbacks
     virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) = 0;
+    virtual void setOnPlayCallback(std::function<void()> callback) = 0;
+    virtual void setOnStopCallback(std::function<void()> callback) = 0;
 };

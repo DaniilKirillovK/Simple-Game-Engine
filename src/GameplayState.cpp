@@ -8,34 +8,30 @@
 #include "Systems/PhysicsSystem.h"
 #include "Systems/TransformSystem.h"
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include "MeshFactory.h"
-#include "Resources/ResourceManager.h"
-
-#include "Components/Material.h"
-#include "Components/Tag.h"
-#include "Components/MeshRenderer.h"
-#include "Components/Collider.h"
-#include "Components/Rigidbody.h"
-#include "Components/Transform.h"
-#include "Components/Camera.h"
-#include "Components/Light.h"
-
-#include "Utils/HierarchyUtils.h"
 #include <filesystem>
 #include "Utils/Serialization/SceneSerializer.h"
 
+GameplayState::GameplayState(IRenderAdapter& renderer)
+: m_renderer(renderer)
+{
+    m_renderer.setOnPlayCallback([this]() {
+        enterPlayMode();
+        });
+
+    m_renderer.setOnStopCallback([this]() {
+        exitPlayMode();
+        });
+}
+
 void GameplayState::onEnter()
 {
-    world = new World();
+    m_world = new World();
 
-    world->addSystem(std::make_unique<TransformSystem>());
-    world->addSystem(std::make_unique<PhysicsSystem>(&renderer));
-	world->addSystem(std::make_unique<RenderSystem>(&renderer));
-	world->addSystem(std::make_unique<CameraSystem>());
-	world->addSystem(std::make_unique<MovementSystem>());
+    m_world->addSystem(std::make_unique<TransformSystem>());
+    m_world->addSystem(std::make_unique<PhysicsSystem>(&m_renderer));
+    m_world->addSystem(std::make_unique<RenderSystem>(&m_renderer));
+    m_world->addSystem(std::make_unique<CameraSystem>());
+    m_world->addSystem(std::make_unique<MovementSystem>());
 
 	setupTestScene();
 
@@ -44,12 +40,39 @@ void GameplayState::onEnter()
 
 void GameplayState::update(float deltaTime)
 {
-	world->update(deltaTime);
+    m_world->update(deltaTime);
 }
 
 void GameplayState::render()
 {
-	renderer.render(world);
+    m_renderer.render(m_world);
+}
+
+void GameplayState::enterPlayMode()
+{
+    LOG_INFO("Entering PLAY mode");
+
+    saveSceneState();
+
+    if (PhysicsSystem* physicsSystem = m_world->getSystem<PhysicsSystem>())
+    {
+        physicsSystem->setEnabled(true);
+    }
+
+    m_playModeActive = true;
+}
+
+void GameplayState::exitPlayMode()
+{
+    LOG_INFO("Exiting PLAY mode, restoring scene state");
+
+    if (PhysicsSystem* physicsSystem = m_world->getSystem<PhysicsSystem>())
+    {
+        physicsSystem->setEnabled(false);
+    }
+
+    m_playModeActive = false;
+    restoreSceneState();
 }
 
 void GameplayState::setupTestScene()
@@ -58,29 +81,29 @@ void GameplayState::setupTestScene()
 
     if (std::filesystem::exists(scenePath)) 
     {
-        if (SceneSerializer::loadScene(renderer, *world, scenePath))
+        if (SceneSerializer::loadScene(m_renderer, *m_world, scenePath))
         {
             LOG_INFO("Scene loaded successfully from: " + scenePath);
         }
     }
 
-    //EntityId camera = world->createEntity();
-    //world->addComponent<Transform>(camera, Transform{
-    //    glm::vec3(0.0f, 5.0f, 10.0f),
-    //    glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-    //    glm::vec3(1.0f, 1.0f, 1.0f),
-    //    glm::vec3(0.0f, 0.0f, 0.0f)
-    //    });
-    //world->addComponent<Tag>(camera, Tag{"Camera"});
-
-    //Camera cam;
-    //cam.aspectRatio = 16.f / 9.f;
-    //cam.fov = 45.0f;
-    //cam.nearPlane = 0.1f;
-    //cam.farPlane = 100.0f;
-    //cam.isActive = true;
-    //world->addComponent<Camera>(camera, cam);
-
     LOG_INFO("3D scene setup complete");
+}
+
+void GameplayState::saveSceneState()
+{
+    m_savedScenePath = "assets/scenes/temp_save.json";
+    SceneSerializer::saveScene(*m_world, m_savedScenePath);
+    LOG_INFO("Scene state saved");
+}
+
+void GameplayState::restoreSceneState()
+{
+    if (std::filesystem::exists(m_savedScenePath))
+    {
+        m_world->clear();
+        SceneSerializer::loadScene(m_renderer, *m_world, m_savedScenePath);
+        LOG_INFO("Scene state restored");
+    }
 }
 

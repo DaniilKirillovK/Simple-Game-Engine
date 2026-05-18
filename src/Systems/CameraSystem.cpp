@@ -92,3 +92,8 @@ void CameraSystem::update(World& world, float deltaTime)
         camera->up = glm::normalize(glm::cross(camera->right, camera->forward));
     }
 }
+
+void CameraSystem::setEnabled(bool isEnabled)
+{
+    m_isEnabled = isEnabled;
+}

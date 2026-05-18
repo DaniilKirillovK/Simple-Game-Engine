@@ -25,7 +25,8 @@ class PhysicsSystem : public ISystem
 public:
     PhysicsSystem(IRenderAdapter* renderAdapter);
 
-    void update(World& world, float deltaTime) override;
+    virtual void update(World& world, float deltaTime) override;
+    virtual void setEnabled(bool isEnabled) override;
 
     void setGravity(const glm::vec3& gravity) { m_gravity = gravity; }
     glm::vec3 getGravity() const { return m_gravity; }
@@ -35,6 +36,7 @@ public:
     void toggleDebugRendering() { m_debugRendering = !m_debugRendering; }
 
 private:
+    bool m_isEnabled = false;
     IRenderAdapter* m_renderer;
 
     glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);

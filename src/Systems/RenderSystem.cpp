@@ -16,6 +16,8 @@ RenderSystem::RenderSystem(IRenderAdapter* renderAdapter)
 
 void RenderSystem::update(World& world, float deltaTime)
 {
+    if (!m_isEnabled) return;
+
     if (!renderAdapter) return;
 
     EntityId activeCamera = INVALID_ENTITY;
@@ -77,4 +79,9 @@ void RenderSystem::update(World& world, float deltaTime)
             }
         }
     }
+}
+
+void RenderSystem::setEnabled(bool isEnabled)
+{
+    m_isEnabled = isEnabled;
 }

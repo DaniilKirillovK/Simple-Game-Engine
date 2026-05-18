@@ -5,6 +5,8 @@
 
 void MovementSystem::update(World& world, float deltaTime)
 {
+    if (!m_isEnabled) return;
+
     {
         static float time = 0.0f;
         time += deltaTime;
@@ -46,4 +48,9 @@ void MovementSystem::update(World& world, float deltaTime)
             }
         }
     }
+}
+
+void MovementSystem::setEnabled(bool isEnabled)
+{
+    m_isEnabled = isEnabled;
 }

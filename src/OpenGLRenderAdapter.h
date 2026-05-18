@@ -51,6 +51,8 @@ public:
 
     // Callbacks
     virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) override { m_onToggleDebugCallback = callback; }
+    virtual void setOnPlayCallback(std::function<void()> callback) { m_onPlayCallback = callback; }
+    virtual void setOnStopCallback(std::function<void()> callback) { m_onStopCallback = callback; }
 
 private:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -88,6 +90,8 @@ private:
 
     // Callbacks
     std::function<void(bool)> m_onToggleDebugCallback;
+    std::function<void()> m_onPlayCallback;
+    std::function<void()> m_onStopCallback;
 
     void createRenderTexture(int width, int height);
     void beginRenderToTexture();
@@ -139,6 +143,7 @@ private:
     bool m_autoSaveEnabled = true;
 
     World* m_world;
+    bool m_isPlaying = false;
 
     // Panels
     bool m_showHierarchy = true;

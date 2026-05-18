@@ -31,6 +31,9 @@ public:
 	template<typename T>
 	ComponentPool<T>& getComponentPool();
 
+	template<typename T>
+	T* getSystem();
+
 	float getCurrentDeltaTime() { return m_currentDeltaTime; }
 
 	void addSystem(std::unique_ptr<ISystem> system);
@@ -128,6 +131,20 @@ inline ComponentPool<T>& World::getComponentPool()
 		return *poolPtr;
 	}
 	return *static_cast<ComponentPool<T>*>(it->second.get());
+}
+
+template<typename T>
+inline T* World::getSystem()
+{
+	for (auto& system : systems)
+	{
+		T* casted = dynamic_cast<T*>(system.get());
+		if (casted)
+		{
+			return casted;
+		}
+	}
+	return nullptr;
 }
 
 inline void World::addSystem(std::unique_ptr<ISystem> system)
