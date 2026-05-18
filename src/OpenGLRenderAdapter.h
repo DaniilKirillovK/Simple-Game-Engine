@@ -7,6 +7,7 @@
 #include "libs/imgui/imgui.h"
 #include "Entity.h"
 #include "ComponentPool.h"
+#include "Logger.h"
 
 class Transform;
 class Hierarchy;
@@ -48,6 +49,9 @@ public:
     virtual void endImGuiFrame() override;
     virtual void shutdownImGui() override;
 
+    // Callbacks
+    virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) override { m_onToggleDebugCallback = callback; }
+
 private:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
@@ -82,23 +86,34 @@ private:
 
     virtual void drawMesh(const Mesh* mesh) override;
 
+    // Callbacks
+    std::function<void(bool)> m_onToggleDebugCallback;
+
     void createRenderTexture(int width, int height);
     void beginRenderToTexture();
     void endRenderToTexture();
     unsigned int getRenderTexture() const { return m_renderTexture; }
     void resizeRenderTexture(int width, int height);
 
-    void renderUI(World* world);
-    void renderUIViewport(World* world);
-    void renderSceneHierarchy(World* world);
-    void renderInspector(World* world);
-    void renderStatistics(World* world);
-    void renderAboutWindow();
+    void renderUI();
+    void renderUIViewport();
+    void renderSceneHierarchy();
+    void renderInspector();
+    void renderStatistics();
     void renderTransformEditor(Transform& transform);
     void renderToolbar(ImVec2 position, ImVec2 size);
+    void renderLogPanel();
+
+    void renderMainMenuBar();
+    void renderAboutWindow();
+    void renderSaveSceneAsPanel();
+    void renderLoadScenePanel();
+
     static void SizeCallback(ImGuiSizeCallbackData* data);
 
-    void renderHierarchyNode(World* world, ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth);
+    void addLogEntry(LogLevel level, const std::string& message);
+
+    void renderHierarchyNode(ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth);
 
     bool initGLFW(int width, int height);
     bool initGLAD();
@@ -113,6 +128,28 @@ private:
     void setupDebugBuffers();
     void flushDebugDraw();
     void createDebugShader();
+
+    // Scene
+    void setCurrentScenePath(const std::string& path) { m_currentScenePath = path; }
+    const std::string& getCurrentScenePath() const { return m_currentScenePath; }
+    void saveCurrentScene();
+    void loadLastScene();
+    void setAutoSaveEnabled(bool enabled) { m_autoSaveEnabled = enabled; }
+    std::string m_currentScenePath = "assets/scenes/test_scene.json";
+    bool m_autoSaveEnabled = true;
+
+    World* m_world;
+
+    // Panels
+    bool m_showHierarchy = true;
+    bool m_showInspector = true;
+    bool m_showStatistics = true;
+    bool m_showViewport = true;
+    bool m_showLogPanel = true;
+    bool m_showAbout = false;
+
+    bool m_showLoadScenePanel = false;
+    bool m_showSaveAsScenePanel = false;
 
     // Key Events
     std::vector<KeyEvent> keyEvents;
@@ -154,10 +191,20 @@ private:
     bool m_gizmoLocalSpace = false;
 
     // Debug
+    bool m_showDebugColliders = true;
     unsigned int m_debugVAO = 0;
     unsigned int m_debugVBO = 0;
     unsigned int m_debugShaderProgram = 0;
     std::vector<DebugVertex> m_debugVertices;
+
+    // Log
+    std::vector<LogEntry> m_logEntries;
+    int m_maxLogEntries = 2000;
+    bool m_autoScrollLogs = true;
+    bool m_showInfo = true;
+    bool m_showWarning = true;
+    bool m_showError = true;
+    bool m_showResourceManager = true;
 
     ImVec2 m_viewportSize = ImVec2(0, 0);
     bool m_viewportHovered = false;

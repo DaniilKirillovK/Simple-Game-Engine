@@ -52,6 +52,11 @@ void Logger::log(LogLevel level, const std::string& message, int detailsLevel)
             fileStream << formatted << std::endl;
         }
 
+        if (g_logCallback) 
+        {
+            g_logCallback(level, formatted);
+        }
+
         mtx.unlock();
     }
 }
@@ -73,4 +78,9 @@ void Logger::setLogFile(const std::string& filename)
     {
         LOG_WARNING("Failed to open log file: " + filename);
     }
+}
+
+void Logger::setLogCallback(std::function<void(LogLevel, const std::string&)> callback)
+{
+    g_logCallback = callback;
 }

@@ -12,7 +12,7 @@ bool SceneSerializer::saveScene(World& world, const std::string& filepath)
     try 
     {
         nlohmann::json j = serializeWorld(world);
-        std::ofstream file(filepath);
+        std::ofstream file("../../../" + filepath);
         if (!file.is_open()) 
         {
             LOG_ERROR("Failed to open file for writing: " + filepath);
@@ -36,12 +36,14 @@ bool SceneSerializer::loadScene(IRenderAdapter& renderAdapter, World& world, con
 {
     try 
     {
-        std::ifstream file(filepath);
+        std::ifstream file("../../../" + filepath);
         if (!file.is_open()) 
         {
             LOG_ERROR("Failed to open file for reading: " + filepath);
             return false;
         }
+
+        world.clear();
 
         nlohmann::json j;
         file >> j;
@@ -71,6 +73,7 @@ nlohmann::json SceneSerializer::serializeWorld(World& world)
     auto& rigidbodies = world.getComponentPool<Rigidbody>();
     auto& colliders = world.getComponentPool<Collider>();
     auto& hierarchies = world.getComponentPool<Hierarchy>();
+    auto& cameras = world.getComponentPool<Camera>();
 
     std::set<EntityId> allEntities;
 
@@ -81,6 +84,7 @@ nlohmann::json SceneSerializer::serializeWorld(World& world)
     for (auto& [entity, _] : rigidbodies.getAll()) allEntities.insert(entity);
     for (auto& [entity, _] : colliders.getAll()) allEntities.insert(entity);
     for (auto& [entity, _] : hierarchies.getAll()) allEntities.insert(entity);
+    for (auto& [entity, _] : cameras.getAll()) allEntities.insert(entity);
 
     for (EntityId entity : allEntities) 
     {
@@ -115,6 +119,10 @@ nlohmann::json SceneSerializer::serializeWorld(World& world)
         {
             entityJson["light"] = serializeLight(*lights.getComponent(entity));
         }
+        if (cameras.hasComponent(entity)) 
+        {
+            entityJson["camera"] = serializeCamera(*cameras.getComponent(entity));
+        }
 
         j["entities"].push_back(entityJson);
     }
@@ -134,6 +142,7 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         nlohmann::json rigidbody;
         nlohmann::json collider;
         nlohmann::json hierarchy;
+        nlohmann::json camera;
     };
 
     std::vector<EntityData> entitiesData;
@@ -154,6 +163,7 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         if (entityJson.contains("rigidbody")) data.rigidbody = entityJson["rigidbody"];
         if (entityJson.contains("collider")) data.collider = entityJson["collider"];
         if (entityJson.contains("hierarchy")) data.hierarchy = entityJson["hierarchy"];
+        if (entityJson.contains("camera")) data.camera = entityJson["camera"];
 
         entitiesData.push_back(data);
     }
@@ -165,7 +175,8 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         if (data.transform.contains("position")) 
         {
             Transform* transform = world.getComponent<Transform>(newId);
-            if (!transform) {
+            if (!transform) 
+            {
                 world.addComponent<Transform>(newId, Transform{});
                 transform = world.getComponent<Transform>(newId);
             }
@@ -236,6 +247,15 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
                 hierarchy = world.getComponent<Hierarchy>(newId);
             }
             deserializeHierarchy(*hierarchy, data.hierarchy);
+        }
+
+        if (data.camera.contains("fov"))
+        {
+            if (!world.hasComponent<Camera>(newId))
+            {
+                world.addComponent<Camera>(newId, Camera{});
+            }
+            deserializeCamera(*world.getComponent<Camera>(newId), data.camera);
         }
     }
 
@@ -427,6 +447,17 @@ nlohmann::json SceneSerializer::serializeHierarchy(const Hierarchy& hierarchy)
 {
     nlohmann::json j;
     j["parent"] = hierarchy.parent;
+    return j;
+}
+
+nlohmann::json SceneSerializer::serializeCamera(const Camera& camera)
+{
+    nlohmann::json j;
+    j["fov"] = camera.fov;
+    j["aspect_ratio"] = camera.aspectRatio;
+    j["near_plane"] = camera.nearPlane;
+    j["far_plane"] = camera.farPlane;
+    j["is_active"] = camera.isActive;
     return j;
 }
 
@@ -640,6 +671,15 @@ void SceneSerializer::deserializeHierarchy(Hierarchy& hierarchy, const nlohmann:
     {
         hierarchy.parent = j["parent"].get<EntityId>();
     }
+}
+
+void SceneSerializer::deserializeCamera(Camera& camera, const nlohmann::json& j)
+{
+    if (j.contains("fov")) camera.fov = j["fov"].get<float>();
+    if (j.contains("aspect_ratio")) camera.aspectRatio = j["aspect_ratio"].get<float>();
+    if (j.contains("near_plane")) camera.nearPlane = j["near_plane"].get<float>();
+    if (j.contains("far_plane")) camera.farPlane = j["far_plane"].get<float>();
+    if (j.contains("is_active")) camera.isActive = j["is_active"].get<bool>();
 }
 
 Mesh* SceneSerializer::createPrimitiveMesh(const nlohmann::json& meshJson)

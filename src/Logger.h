@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <fstream>
+#include <chrono>
+#include <functional>
 
 constexpr int LOG_DETAILS_LEVEL = 3;
 
@@ -13,12 +15,23 @@ constexpr int LOG_DETAILS_LEVEL = 3;
 
 enum class LogLevel { Info, Warning, Error, ResourceManager, ResourceManagerError };
 
+struct LogEntry
+{
+    std::string message;
+    LogLevel level;
+    std::chrono::system_clock::time_point timestamp;
+};
+
+static std::function<void(LogLevel, const std::string&)> g_logCallback = nullptr;
+
 class Logger 
 {
 public:
     static Logger& instance();
     static void log(LogLevel level, const std::string& message, int detailsLevel = 1);
     static void setLogFile(const std::string& filename);
+
+    void setLogCallback(std::function<void(LogLevel, const std::string&)> callback);
 
 private:
     Logger() = default;

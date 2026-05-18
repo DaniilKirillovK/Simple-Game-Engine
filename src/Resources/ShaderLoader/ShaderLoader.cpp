@@ -46,6 +46,7 @@ std::unique_ptr<Shader> ShaderLoader::loadFromFile(const std::string& shaderPath
     auto shader = std::make_unique<Shader>();
     shader->shaderId = shaderId;
     shader->shaderType = shaderType;
+    shader->shaderPath = shaderPath;
 
     LOG_RESOURCEMANAGER("Shader loaded and cached: " + shaderPath);
     return shader;

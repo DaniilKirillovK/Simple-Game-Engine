@@ -78,4 +78,7 @@ public:
     virtual unsigned int linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader) = 0;
     virtual void deleteShaderObject(unsigned int shader) = 0;
     virtual void deleteShaderProgram(unsigned int program) = 0;
+
+    // Callbacks
+    virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) = 0;
 };

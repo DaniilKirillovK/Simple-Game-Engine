@@ -1,211 +1,586 @@
 {
-    "version": 1,
     "entities": [
         {
+            "collider": {
+                "bounciness": 0.5,
+                "friction": 0.5,
+                "half_size": [
+                    10.0,
+                    0.5,
+                    10.0
+                ],
+                "is_trigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "type": "box"
+            },
             "id": 1,
-            "transform": {
-                "position": [0.0, 0.0, 0.0],
-                "rotation": [0.0, 0.0, 0.0],
-                "scale": [20.0, 1.0, 20.0]
+            "mesh_renderer": {
+                "material": {
+                    "ambient_color": [
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224
+                    ],
+                    "diffuse_color": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "diffuse_texture_path": "assets/t_grass.jpg",
+                    "fragment_shader_path": "Shaders/Default.frag",
+                    "has_texture": true,
+                    "shininess": 32.0,
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "vertex_shader_path": "Shaders/Default.vert"
+                },
+                "mesh": {
+                    "type": "cube"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "rigidbody": {
+                "is_kinematic": true,
+                "mass": 100.0,
+                "use_gravity": false,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
             },
             "tag": {
                 "name": "Grass Platform"
             },
-            "mesh_renderer": {
-                "visible": true,
-                "render_layer": 0,
-                "mesh": {
-                    "type": "cube"
-                },
-                "material": {
-                    "diffuse_color": [0.0, 0.0, 0.0, 1.0],
-                    "specular_color": [0.5, 0.5, 0.5, 1.0],
-                    "ambient_color": [0.2, 0.2, 0.2, 1.0],
-                    "shininess": 32.0,
-                    "has_texture": true,
-                    "diffuse_texture_path": "assets/t_grass.jpg",
-                    "vertex_shader_path": "Shaders/Default.vert",
-                    "fragment_shader_path": "Shaders/Default.frag"
-                }
-            },
-            "rigidbody": {
-                "mass": 100.0,
-                "use_gravity": false,
-                "is_kinematic": true,
-                "velocity": [0.0, 0.0, 0.0]
-            },
-            "collider": {
-                "type": "box",
-                "half_size": [10.0, 0.5, 10.0],
-                "offset": [0.0, 0.0, 0.0],
-                "bounciness": 0.5,
-                "friction": 0.5,
-                "is_trigger": false
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    20.0,
+                    1.0,
+                    20.0
+                ]
             }
         },
         {
+            "collider": {
+                "bounciness": 0.5,
+                "friction": 0.5,
+                "half_size": [
+                    0.5,
+                    2.5,
+                    10.0
+                ],
+                "is_trigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "type": "box"
+            },
             "id": 2,
-            "transform": {
-                "position": [-10.0, 2.5, 0.0],
-                "rotation": [0.0, 0.0, 0.0],
-                "scale": [1.0, 5.0, 20.0]
+            "mesh_renderer": {
+                "material": {
+                    "ambient_color": [
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224
+                    ],
+                    "diffuse_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        1.0
+                    ],
+                    "fragment_shader_path": "Shaders/Default.frag",
+                    "has_texture": false,
+                    "shininess": 32.0,
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "vertex_shader_path": "Shaders/Default.vert"
+                },
+                "mesh": {
+                    "type": "cube"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "rigidbody": {
+                "is_kinematic": true,
+                "mass": 1.0,
+                "use_gravity": false,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
             },
             "tag": {
                 "name": "Wall 1"
             },
-            "mesh_renderer": {
-                "visible": true,
-                "render_layer": 0,
-                "mesh": {
-                    "type": "cube"
-                },
-                "material": {
-                    "diffuse_color": [0.5, 0.5, 0.5, 1.0],
-                    "specular_color": [0.5, 0.5, 0.5, 1.0],
-                    "ambient_color": [0.2, 0.2, 0.2, 1.0],
-                    "shininess": 32.0,
-                    "has_texture": false,
-                    "vertex_shader_path": "Shaders/Default.vert",
-                    "fragment_shader_path": "Shaders/Default.frag"
-                }
-            },
-            "rigidbody": {
-                "mass": 1.0,
-                "use_gravity": false,
-                "is_kinematic": true,
-                "velocity": [0.0, 0.0, 0.0]
-            },
-            "collider": {
-                "type": "box",
-                "half_size": [0.5, 2.5, 10.0],
-                "offset": [0.0, 0.0, 0.0],
-                "bounciness": 0.5,
-                "friction": 0.5,
-                "is_trigger": false
+            "transform": {
+                "position": [
+                    -10.0,
+                    2.5,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    5.0,
+                    20.0
+                ]
             }
         },
         {
+            "collider": {
+                "bounciness": 0.5,
+                "friction": 0.5,
+                "half_size": [
+                    10.0,
+                    2.5,
+                    0.5
+                ],
+                "is_trigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "type": "box"
+            },
             "id": 3,
-            "transform": {
-                "position": [0.0, 2.5, 10.0],
-                "rotation": [0.0, 0.0, 0.0],
-                "scale": [20.0, 5.0, 1.0]
+            "mesh_renderer": {
+                "material": {
+                    "ambient_color": [
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224
+                    ],
+                    "diffuse_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        1.0
+                    ],
+                    "fragment_shader_path": "Shaders/Default.frag",
+                    "has_texture": false,
+                    "shininess": 32.0,
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "vertex_shader_path": "Shaders/Default.vert"
+                },
+                "mesh": {
+                    "type": "cube"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "rigidbody": {
+                "is_kinematic": true,
+                "mass": 1.0,
+                "use_gravity": false,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
             },
             "tag": {
                 "name": "Wall 2"
             },
-            "mesh_renderer": {
-                "visible": true,
-                "render_layer": 0,
-                "mesh": {
-                    "type": "cube"
-                },
-                "material": {
-                    "diffuse_color": [0.5, 0.5, 0.5, 1.0],
-                    "specular_color": [0.5, 0.5, 0.5, 1.0],
-                    "ambient_color": [0.2, 0.2, 0.2, 1.0],
-                    "shininess": 32.0,
-                    "has_texture": false,
-                    "vertex_shader_path": "Shaders/Default.vert",
-                    "fragment_shader_path": "Shaders/Default.frag"
-                }
-            },
-            "rigidbody": {
-                "mass": 1.0,
-                "use_gravity": false,
-                "is_kinematic": true,
-                "velocity": [0.0, 0.0, 0.0]
-            },
-            "collider": {
-                "type": "box",
-                "half_size": [10.0, 2.5, 0.5],
-                "offset": [0.0, 0.0, 0.0],
-                "bounciness": 0.5,
-                "friction": 0.5,
-                "is_trigger": false
+            "transform": {
+                "position": [
+                    0.0,
+                    2.5,
+                    10.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    20.0,
+                    5.0,
+                    1.0
+                ]
             }
         },
         {
+            "collider": {
+                "bounciness": 0.5,
+                "friction": 0.5,
+                "half_size": [
+                    0.5,
+                    2.5,
+                    10.0
+                ],
+                "is_trigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "type": "box"
+            },
             "id": 4,
-            "transform": {
-                "position": [10.0, 2.5, 0.0],
-                "rotation": [0.0, 0.0, 0.0],
-                "scale": [1.0, 5.0, 20.0]
+            "mesh_renderer": {
+                "material": {
+                    "ambient_color": [
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224
+                    ],
+                    "diffuse_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        1.0
+                    ],
+                    "fragment_shader_path": "Shaders/Default.frag",
+                    "has_texture": false,
+                    "shininess": 32.0,
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "vertex_shader_path": "Shaders/Default.vert"
+                },
+                "mesh": {
+                    "type": "cube"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "rigidbody": {
+                "is_kinematic": true,
+                "mass": 1.0,
+                "use_gravity": false,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
             },
             "tag": {
                 "name": "Wall 3"
             },
-            "mesh_renderer": {
-                "visible": true,
-                "render_layer": 0,
-                "mesh": {
-                    "type": "cube"
-                },
-                "material": {
-                    "diffuse_color": [0.5, 0.5, 0.5, 1.0],
-                    "specular_color": [0.5, 0.5, 0.5, 1.0],
-                    "ambient_color": [0.2, 0.2, 0.2, 1.0],
-                    "shininess": 32.0,
-                    "has_texture": false,
-                    "vertex_shader_path": "Shaders/Default.vert",
-                    "fragment_shader_path": "Shaders/Default.frag"
-                }
-            },
-            "rigidbody": {
-                "mass": 1.0,
-                "use_gravity": false,
-                "is_kinematic": true,
-                "velocity": [0.0, 0.0, 0.0]
-            },
-            "collider": {
-                "type": "box",
-                "half_size": [0.5, 2.5, 10.0],
-                "offset": [0.0, 0.0, 0.0],
-                "bounciness": 0.5,
-                "friction": 0.5,
-                "is_trigger": false
+            "transform": {
+                "position": [
+                    17.822635650634766,
+                    2.5,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    5.0,
+                    20.0
+                ]
             }
         },
         {
+            "collider": {
+                "bounciness": 0.5,
+                "friction": 0.5,
+                "half_size": [
+                    10.0,
+                    2.5,
+                    0.5
+                ],
+                "is_trigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "type": "box"
+            },
             "id": 5,
-            "transform": {
-                "position": [0.0, 2.5, -10.0],
-                "rotation": [0.0, 0.0, 0.0],
-                "scale": [20.0, 5.0, 1.0]
+            "mesh_renderer": {
+                "material": {
+                    "ambient_color": [
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224
+                    ],
+                    "diffuse_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        1.0
+                    ],
+                    "fragment_shader_path": "Shaders/Default.frag",
+                    "has_texture": false,
+                    "shininess": 32.0,
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "vertex_shader_path": "Shaders/Default.vert"
+                },
+                "mesh": {
+                    "type": "cube"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "rigidbody": {
+                "is_kinematic": true,
+                "mass": 1.0,
+                "use_gravity": false,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
             },
             "tag": {
                 "name": "Wall 4"
             },
-            "mesh_renderer": {
-                "visible": true,
-                "render_layer": 0,
-                "mesh": {
-                    "type": "cube"
-                },
-                "material": {
-                    "diffuse_color": [0.5, 0.5, 0.5, 1.0],
-                    "specular_color": [0.5, 0.5, 0.5, 1.0],
-                    "ambient_color": [0.2, 0.2, 0.2, 1.0],
-                    "shininess": 32.0,
-                    "has_texture": false,
-                    "vertex_shader_path": "Shaders/Default.vert",
-                    "fragment_shader_path": "Shaders/Default.frag"
-                }
+            "transform": {
+                "position": [
+                    0.0,
+                    2.5,
+                    -10.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    20.0,
+                    5.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "camera": {
+                "aspect_ratio": 1.7777777910232544,
+                "far_plane": 100.0,
+                "fov": 45.0,
+                "is_active": true,
+                "near_plane": 0.10000000149011612
             },
-            "rigidbody": {
-                "mass": 1.0,
-                "use_gravity": false,
-                "is_kinematic": true,
-                "velocity": [0.0, 0.0, 0.0]
+            "id": 6,
+            "tag": {
+                "name": "Camera"
             },
-            "collider": {
-                "type": "box",
-                "half_size": [10.0, 2.5, 0.5],
-                "offset": [0.0, 0.0, 0.0],
-                "bounciness": 0.5,
-                "friction": 0.5,
-                "is_trigger": false
+            "transform": {
+                "position": [
+                    20.227445602416992,
+                    14.976028442382813,
+                    26.44627571105957
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "id": 7,
+            "light": {
+                "color": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "constant": 1.0,
+                "cut_off": 0.9659258127212524,
+                "direction": [
+                    0.5773500204086304,
+                    -0.5773500204086304,
+                    0.5773500204086304
+                ],
+                "enabled": true,
+                "intensity": 0.5,
+                "linear": 0.09000000357627869,
+                "outer_cut_off": 0.9659258127212524,
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "quadratic": 0.03200000151991844,
+                "range": 50.0,
+                "type": "directional"
+            },
+            "tag": {
+                "name": "Directional Light 1"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "id": 8,
+            "light": {
+                "color": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "constant": 1.0,
+                "cut_off": 0.9659258127212524,
+                "direction": [
+                    -0.5773500204086304,
+                    -0.5773500204086304,
+                    0.5773500204086304
+                ],
+                "enabled": true,
+                "intensity": 0.5,
+                "linear": 0.09000000357627869,
+                "outer_cut_off": 0.9659258127212524,
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "quadratic": 0.03200000151991844,
+                "range": 50.0,
+                "type": "directional"
+            },
+            "tag": {
+                "name": "Directional Light 2"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "id": 9,
+            "light": {
+                "color": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "constant": 1.0,
+                "cut_off": 0.9659258127212524,
+                "direction": [
+                    0.0,
+                    -0.7070000171661377,
+                    -0.7070000171661377
+                ],
+                "enabled": true,
+                "intensity": 0.20000000298023224,
+                "linear": 0.09000000357627869,
+                "outer_cut_off": 0.9659258127212524,
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "quadratic": 0.03200000151991844,
+                "range": 50.0,
+                "type": "directional"
+            },
+            "tag": {
+                "name": "Directional Light 3"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    -0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
             }
         }
-    ]
+    ],
+    "version": 1
 }

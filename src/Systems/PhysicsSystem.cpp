@@ -10,7 +10,16 @@
 #include <cmath>
 
 PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
-    : m_renderer(renderer) {}
+    : m_renderer(renderer) 
+{
+    m_renderer->setOnToggleDebugCallback([this](bool enabled) {
+        if (this) 
+        {
+            setDebugRendering(enabled);
+            LOG_INFO("Debug colliders: " + std::string(enabled ? "ON" : "OFF"));
+        }
+    });
+}
 
 void PhysicsSystem::update(World& world, float deltaTime)
 {
@@ -39,10 +48,10 @@ void PhysicsSystem::update(World& world, float deltaTime)
         m_accumulator -= m_fixedTimestep;
     }
 
-    if (InputHandler::getInstance().isActionJustPressed("ToggleDebug"))
-    {
-        toggleDebugRendering();
-    }
+    //if (InputHandler::getInstance().isActionJustPressed("ToggleDebug"))
+    //{
+    //    toggleDebugRendering();
+    //}
     if (m_debugRendering && m_renderer)
     {
         renderDebugColliders(world);

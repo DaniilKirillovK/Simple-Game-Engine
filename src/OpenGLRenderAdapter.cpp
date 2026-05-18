@@ -24,6 +24,8 @@
 #include "Components/Collider.h"
 
 #include "Utils/HierarchyUtils.h"
+#include "Utils/Serialization/SceneSerializer.h"
+#include "libs/imgui/imgui_internal.h"
 
 static const char* debugVertexShaderSource = R"(
     #version 330 core
@@ -100,6 +102,8 @@ bool OpenGLRenderAdapter::initialize(int width, int height)
 
 void OpenGLRenderAdapter::render(World* world)
 {
+    m_world = world;
+
     endRenderToTexture();
 
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
@@ -108,7 +112,7 @@ void OpenGLRenderAdapter::render(World* world)
     beginImGuiFrame();
     ImGui::DockSpaceOverViewport();
 
-    renderUI(world);
+    renderUI();
     
     endImGuiFrame();
     glfwSwapBuffers(m_window);
@@ -122,6 +126,11 @@ void OpenGLRenderAdapter::render(World* world)
 void OpenGLRenderAdapter::shutdown()
 {
     LOG_INFO("OpenGL shutting down");
+
+    if (m_autoSaveEnabled)
+    {
+        saveCurrentScene();
+    }
 
     // Clear resources
     for (auto &[mesh, vao]: meshVAOs)
@@ -280,6 +289,13 @@ void OpenGLRenderAdapter::initImGui()
 
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    Logger::instance().setLogCallback([](LogLevel level, const std::string& message) {
+        if (g_instance) 
+        {
+            g_instance->addLogEntry(level, message);
+        }
+    });
 
     LOG_INFO("OpenGLRenderAdapter: ImGui initialized");
 }
@@ -619,15 +635,18 @@ void OpenGLRenderAdapter::resizeRenderTexture(int width, int height)
     createRenderTexture(width, height);
 }
 
-void OpenGLRenderAdapter::renderUI(World* world)
+void OpenGLRenderAdapter::renderUI()
 {
-    renderUIViewport(world);
-    renderSceneHierarchy(world);
-    renderInspector(world);
-    renderStatistics(world);
+    renderMainMenuBar();
+
+    if (m_showViewport) renderUIViewport();
+    if (m_showHierarchy) renderSceneHierarchy();
+    if (m_showInspector) renderInspector();
+    if (m_showStatistics) renderStatistics();
+    if (m_showLogPanel) renderLogPanel();
 }
 
-void OpenGLRenderAdapter::renderUIViewport(World* world)
+void OpenGLRenderAdapter::renderUIViewport()
 {
     float aspectRatio = 16.0f / 9.0f;
     ImGui::Begin("Viewport", nullptr, 
@@ -668,11 +687,11 @@ void OpenGLRenderAdapter::renderUIViewport(World* world)
         ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
         ImGuizmo::SetRect(imagePos.x, imagePos.y, imageSize.x, imageSize.y);
 
-        if (m_selectedEntity != -1 && world)
+        if (m_selectedEntity != -1 && m_world)
         {
-            Transform* entityTransform = world->getComponent<Transform>(m_selectedEntity);
-            EntityId parentId = HierarchyUtils::getParent(world, m_selectedEntity);
-            Transform* parentTransform = (parentId != -1) ? world->getComponent<Transform>(parentId) : nullptr;
+            Transform* entityTransform = m_world->getComponent<Transform>(m_selectedEntity);
+            EntityId parentId = HierarchyUtils::getParent(m_world, m_selectedEntity);
+            Transform* parentTransform = (parentId != -1) ? m_world->getComponent<Transform>(parentId) : nullptr;
 
             if (entityTransform)
             {
@@ -729,7 +748,7 @@ void OpenGLRenderAdapter::renderUIViewport(World* world)
 
                     entityTransform->markDirty();
 
-                    HierarchyUtils::markChildrenDirty(world, m_selectedEntity);
+                    HierarchyUtils::markChildrenDirty(m_world, m_selectedEntity);
                 }
             }
         }
@@ -742,17 +761,18 @@ void OpenGLRenderAdapter::renderUIViewport(World* world)
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderSceneHierarchy(World* world)
+void OpenGLRenderAdapter::renderSceneHierarchy()
 {
     ImGui::Begin("Scene Hierarchy");
 
-    if (!world) {
+    if (!m_world)
+    {
         ImGui::End();
         return;
     }
 
-    auto& transforms = world->getComponentPool<Transform>();
-    auto& hierarchies = world->getComponentPool<Hierarchy>();
+    auto& transforms = m_world->getComponentPool<Transform>();
+    auto& hierarchies = m_world->getComponentPool<Hierarchy>();
 
     std::vector<EntityId> rootEntities;
 
@@ -775,13 +795,13 @@ void OpenGLRenderAdapter::renderSceneHierarchy(World* world)
 
     for (EntityId root : rootEntities)
     {
-        renderHierarchyNode(world, hierarchies, transforms, root, 0);
+        renderHierarchyNode(hierarchies, transforms, root, 0);
     }
 
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderInspector(World* world)
+void OpenGLRenderAdapter::renderInspector()
 {
     ImGui::Begin("Inspector");
 
@@ -797,7 +817,7 @@ void OpenGLRenderAdapter::renderInspector(World* world)
 
     ImGui::Separator();
 
-    if (Transform* transform = world->getComponent<Transform>(m_selectedEntity))
+    if (Transform* transform = m_world->getComponent<Transform>(m_selectedEntity))
     {
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -805,7 +825,7 @@ void OpenGLRenderAdapter::renderInspector(World* world)
         }
     }
 
-    if (Tag* tag = world->getComponent<Tag>(m_selectedEntity))
+    if (Tag* tag = m_world->getComponent<Tag>(m_selectedEntity))
     {
         if (ImGui::CollapsingHeader("Tag", ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -823,12 +843,12 @@ void OpenGLRenderAdapter::renderInspector(World* world)
         {
             if (ImGui::MenuItem("Add Tag"))
             {
-                world->addComponent<Tag>(m_selectedEntity, Tag{});
+                m_world->addComponent<Tag>(m_selectedEntity, Tag{});
             }
         }
     }
 
-    if (MeshRenderer* meshRenderer = world->getComponent<MeshRenderer>(m_selectedEntity))
+    if (MeshRenderer* meshRenderer = m_world->getComponent<MeshRenderer>(m_selectedEntity))
     {
         if (ImGui::CollapsingHeader("Mesh Renderer"))
         {
@@ -836,7 +856,7 @@ void OpenGLRenderAdapter::renderInspector(World* world)
         }
     }
 
-    if (Rigidbody* rb = world->getComponent<Rigidbody>(m_selectedEntity))
+    if (Rigidbody* rb = m_world->getComponent<Rigidbody>(m_selectedEntity))
     {
         if (ImGui::CollapsingHeader("Rigidbody"))
         {
@@ -848,7 +868,7 @@ void OpenGLRenderAdapter::renderInspector(World* world)
         }
     }
 
-    if (Collider* collider = world->getComponent<Collider>(m_selectedEntity))
+    if (Collider* collider = m_world->getComponent<Collider>(m_selectedEntity))
     {
         if (ImGui::CollapsingHeader("Collider"))
         {
@@ -874,17 +894,98 @@ void OpenGLRenderAdapter::renderInspector(World* world)
         }
     }
 
+    if (Light* light = m_world->getComponent<Light>(m_selectedEntity))
+    {
+        if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Checkbox("Enabled", &light->enabled);
+
+            const char* lightTypes[] = { "Directional", "Point", "Spot" };
+            int currentType = static_cast<int>(light->type);
+            if (ImGui::Combo("Type", &currentType, lightTypes, 3))
+            {
+                light->type = static_cast<LightType>(currentType);
+            }
+
+            ImGui::Separator();
+
+            ImGui::ColorEdit3("Color", glm::value_ptr(light->color));
+            ImGui::DragFloat("Intensity", &light->intensity, 0.1f, 0.0f, 10.0f);
+
+            ImGui::Separator();
+
+            if (light->type == LightType::Directional)
+            {
+                ImGui::DragFloat3("Direction", glm::value_ptr(light->direction), 0.1f, -1.0f, 1.0f);
+
+                if (ImGui::Button("Normalize Direction"))
+                {
+                    light->direction = glm::normalize(light->direction);
+                }
+            }
+            else if (light->type == LightType::Point)
+            {
+                ImGui::DragFloat("Constant", &light->constant, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Linear", &light->linear, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Quadratic", &light->quadratic, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Range", &light->range, 1.0f, 0.0f, 100.0f);
+            }
+            else if (light->type == LightType::Spot)
+            {
+                ImGui::DragFloat("Constant", &light->constant, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Linear", &light->linear, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Quadratic", &light->quadratic, 0.01f, 0.0f, 10.0f);
+
+                float cutOffDeg = glm::degrees(glm::acos(light->cutOff));
+                float outerCutOffDeg = glm::degrees(glm::acos(light->outerCutOff));
+
+                if (ImGui::DragFloat("Cut Off", &cutOffDeg, 0.5f, 0.0f, 90.0f))
+                {
+                    light->cutOff = glm::cos(glm::radians(cutOffDeg));
+                }
+                if (ImGui::DragFloat("Outer Cut Off", &outerCutOffDeg, 0.5f, 0.0f, 90.0f))
+                {
+                    light->outerCutOff = glm::cos(glm::radians(outerCutOffDeg));
+                }
+
+                ImGui::DragFloat3("Direction", glm::value_ptr(light->direction), 0.1f, -1.0f, 1.0f);
+
+                if (ImGui::Button("Normalize Direction"))
+                {
+                    light->direction = glm::normalize(light->direction);
+                }
+            }
+
+            ImGui::Separator();
+
+            if (light->type != LightType::Directional)
+            {
+                if (m_world->hasComponent<Transform>(m_selectedEntity))
+                {
+                    Transform* transform = m_world->getComponent<Transform>(m_selectedEntity);
+                    if (transform)
+                    {
+                        ImGui::Text("World Position: (%.2f, %.2f, %.2f)",
+                            transform->getWorldPosition().x,
+                            transform->getWorldPosition().y,
+                            transform->getWorldPosition().z);
+                    }
+                }
+            }
+        }
+    }
+
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderStatistics(World* world)
+void OpenGLRenderAdapter::renderStatistics()
 {
     ImGui::Begin("Statistics");
 
     static float fpsHistory[100] = { 0 };
     static int fpsIndex = 0;
 
-    float deltaTime = world->getCurrentDeltaTime();
+    float deltaTime = m_world->getCurrentDeltaTime();
 
     m_fpsCounter++;
     m_fpsAccumulator += deltaTime;
@@ -902,19 +1003,19 @@ void OpenGLRenderAdapter::renderStatistics(World* world)
     ImGui::Text("Frame Time: %.2f ms", deltaTime * 1000.0f);
 
     ImGui::Separator();
-    if (world)
+    if (m_world)
     {
         int totalEntities = 0;
         int meshRenderersCount = 0;
         int rigidbodiesCount = 0;
 
-        auto& transforms = world->getComponentPool<Transform>();
+        auto& transforms = m_world->getComponentPool<Transform>();
         totalEntities = transforms.getAll().size();
 
-        auto& meshRenderers = world->getComponentPool<MeshRenderer>();
+        auto& meshRenderers = m_world->getComponentPool<MeshRenderer>();
         meshRenderersCount = meshRenderers.getAll().size();
 
-        auto& rigidbodies = world->getComponentPool<Rigidbody>();
+        auto& rigidbodies = m_world->getComponentPool<Rigidbody>();
         rigidbodiesCount = rigidbodies.getAll().size();
 
         ImGui::Text("Total Entities: %d", totalEntities);
@@ -932,8 +1033,149 @@ void OpenGLRenderAdapter::renderStatistics(World* world)
     ImGui::End();
 }
 
+void OpenGLRenderAdapter::renderMainMenuBar()
+{
+    m_showSaveAsScenePanel = false;
+    m_showLoadScenePanel = false;
+
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Save Scene"))
+            {
+                saveCurrentScene();
+            }
+
+            if (ImGui::MenuItem("Save Scene As..."))
+            {
+                m_showSaveAsScenePanel = true;
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Load Scene"))
+            {
+                m_showLoadScenePanel = true;
+            }
+
+            ImGui::Separator();
+
+            ImGui::MenuItem("Auto Save", nullptr, &m_autoSaveEnabled);
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Exit"))
+            {
+                if (m_autoSaveEnabled) saveCurrentScene();
+                glfwSetWindowShouldClose(m_window, true);
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            ImGui::MenuItem("Scene Hierarchy", nullptr, &m_showHierarchy);
+            ImGui::MenuItem("Inspector", nullptr, &m_showInspector);
+            ImGui::MenuItem("Statistics", nullptr, &m_showStatistics);
+            ImGui::MenuItem("Viewport", nullptr, &m_showViewport);
+            ImGui::MenuItem("Log Console", nullptr, &m_showLogPanel);
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Help"))
+        {
+            if (ImGui::MenuItem("About"))
+            {
+                m_showAbout = true;
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Documentation"))
+            {
+                //
+            }
+
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
+    }
+
+    if (m_showLoadScenePanel)
+    {
+        ImGui::OpenPopup("LoadScenePanel");
+    }
+    renderLoadScenePanel();
+
+    if (m_showSaveAsScenePanel)
+    {
+        ImGui::OpenPopup("SaveSceneAsPanel");
+    }
+    renderSaveSceneAsPanel();
+
+    renderAboutWindow();
+}
+
 void OpenGLRenderAdapter::renderAboutWindow()
 {
+    if (!m_showAbout) return;
+
+    ImGui::Begin("About", &m_showAbout, ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::Text("Simple Game Engine");
+    ImGui::Text("Version 1.0.0");
+    ImGui::Separator();
+    ImGui::Text("A custom game engine with ECS architecture");
+
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderSaveSceneAsPanel()
+{
+    if (ImGui::BeginPopupModal("SaveSceneAsPanel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static char filename[256] = "scene.json";
+        ImGui::InputText("Filename", filename, sizeof(filename));
+
+        if (ImGui::Button("Save"))
+        {
+            m_currentScenePath = "assets/scenes/" + std::string(filename);
+            saveCurrentScene();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void OpenGLRenderAdapter::renderLoadScenePanel()
+{
+    if (ImGui::BeginPopupModal("LoadScenePanel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static char filename[256] = "scene.json";
+        ImGui::InputText("Filename", filename, sizeof(filename));
+
+        if (ImGui::Button("Load"))
+        {
+            m_currentScenePath = "assets/scenes/" + std::string(filename);
+            loadLastScene();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 }
 
 void OpenGLRenderAdapter::renderTransformEditor(Transform& transform)
@@ -986,8 +1228,88 @@ void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
         ImGui::SameLine(200);
         ImGui::Checkbox("Local", &m_gizmoLocalSpace);
 
-        ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+        ImGui::SameLine(300);
+
+        if (ImGui::Checkbox("Debug Colliders", &m_showDebugColliders))
+        {
+            if (m_onToggleDebugCallback)
+            {
+                m_onToggleDebugCallback(m_showDebugColliders);
+            }
+        }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("(F3)");
     }
+    ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderLogPanel()
+{
+    ImGui::Begin("Log Console");
+
+    ImGui::Checkbox("Auto-scroll", &m_autoScrollLogs);
+    ImGui::SameLine();
+    if (ImGui::Button("Clear")) 
+    {
+        m_logEntries.clear();
+    }
+    ImGui::SameLine();
+
+    ImGui::Separator();
+
+    ImGui::Text("Filters:");
+    ImGui::SameLine();
+    ImGui::Checkbox("Info", &m_showInfo);
+    ImGui::SameLine();
+    ImGui::Checkbox("Warning", &m_showWarning);
+    ImGui::SameLine();
+    ImGui::Checkbox("Error", &m_showError);
+    ImGui::SameLine();
+    ImGui::Checkbox("ResourceManager", &m_showResourceManager);
+
+    ImGui::Separator();
+
+    ImGui::BeginChild("LogScrollRegion", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+    for (const auto& entry : m_logEntries)
+    {
+        bool shouldShow = false;
+        switch (entry.level) 
+        {
+        case LogLevel::Info: shouldShow = m_showInfo; break;
+        case LogLevel::Warning: shouldShow = m_showWarning; break;
+        case LogLevel::Error: shouldShow = m_showError; break;
+        case LogLevel::ResourceManager:
+        case LogLevel::ResourceManagerError:
+            shouldShow = m_showResourceManager;
+            break;
+        }
+
+        if (!shouldShow) continue;
+
+        ImVec4 color;
+        switch (entry.level) 
+        {
+        case LogLevel::Info: color = ImVec4(0.8f, 0.8f, 0.8f, 1.0f); break;
+        case LogLevel::Warning: color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f); break;
+        case LogLevel::Error: color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); break;
+        case LogLevel::ResourceManager: color = ImVec4(0.4f, 0.8f, 0.4f, 1.0f); break;
+        case LogLevel::ResourceManagerError: color = ImVec4(1.0f, 0.5f, 0.0f, 1.0f); break;
+        }
+
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        ImGui::TextUnformatted(entry.message.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    if (m_autoScrollLogs && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) 
+    {
+        ImGui::SetScrollHereY(1.0f);
+    }
+
+    ImGui::EndChild();
+
     ImGui::End();
 }
 
@@ -998,12 +1320,54 @@ void OpenGLRenderAdapter::SizeCallback(ImGuiSizeCallbackData* data)
     data->DesiredSize.y = newHeight;
 }
 
-void OpenGLRenderAdapter::renderHierarchyNode(World* world, ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth)
+void OpenGLRenderAdapter::addLogEntry(LogLevel level, const std::string& message)
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    char timeStr[26];
+    ctime_s(timeStr, sizeof(timeStr), &t);
+    timeStr[24] = '\0';
+
+    std::string levelStr;
+    switch (level) 
+    {
+    case LogLevel::Info: 
+        levelStr = "INFO"; 
+        break;
+    case LogLevel::Warning: 
+        levelStr = "WARNING"; 
+        break;
+    case LogLevel::Error: 
+        levelStr = "ERROR"; 
+        break;
+    case LogLevel::ResourceManager: 
+        levelStr = "RESOURCEMANAGER"; 
+        break;
+    case LogLevel::ResourceManagerError: 
+        levelStr = "RESOURCEMANAGER ERROR"; 
+        break;
+    }
+
+    std::string formatted = "[" + std::string(timeStr) + "] [" + levelStr + "] " + message;
+
+    LogEntry entry;
+    entry.message = formatted;
+    entry.level = level;
+    entry.timestamp = now;
+    m_logEntries.push_back(entry);
+
+    while (m_logEntries.size() > m_maxLogEntries) 
+    {
+        m_logEntries.erase(m_logEntries.begin());
+    }
+}
+
+void OpenGLRenderAdapter::renderHierarchyNode(ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth)
 {
     std::string entityName = "Entity " + std::to_string(entity);
-    if (world->hasComponent<Tag>(entity))
+    if (m_world->hasComponent<Tag>(entity))
     {
-        Tag* tag = world->getComponent<Tag>(entity);
+        Tag* tag = m_world->getComponent<Tag>(entity);
         if (tag && !tag->name.empty())
         {
             entityName = tag->name;
@@ -1069,7 +1433,7 @@ void OpenGLRenderAdapter::renderHierarchyNode(World* world, ComponentPool<Hierar
         {
             if (transforms.hasComponent(child))
             {
-                renderHierarchyNode(world, hierarchies, transforms, child, depth + 1);
+                renderHierarchyNode(hierarchies, transforms, child, depth + 1);
             }
         }
         ImGui::TreePop();
@@ -1304,6 +1668,27 @@ void OpenGLRenderAdapter::createDebugShader()
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+}
+
+void OpenGLRenderAdapter::saveCurrentScene()
+{
+    if (m_world && !m_currentScenePath.empty())
+    {
+        SceneSerializer::saveScene(*m_world, m_currentScenePath);
+    }
+    else if (m_world)
+    {
+        std::string defaultPath = "assets/scenes/last_scene.json";
+        SceneSerializer::saveScene(*m_world, defaultPath);
+    }
+}
+
+void OpenGLRenderAdapter::loadLastScene()
+{
+    if (std::filesystem::exists(m_currentScenePath))
+    {
+        SceneSerializer::loadScene(*this, *m_world, m_currentScenePath);
+    }
 }
 
 bool OpenGLRenderAdapter::shouldClose() const

@@ -36,6 +36,8 @@ public:
 	void addSystem(std::unique_ptr<ISystem> system);
 	void update(float deltaTime);
 
+	void clear();
+
 private:
 	float m_currentDeltaTime;
 	EntityId nextEntityId;
@@ -140,4 +142,11 @@ inline void World::update(float deltaTime)
 	{
 		system->update(*this, deltaTime);
 	}
+}
+
+inline void World::clear()
+{
+	componentPools.clear();
+	entities.clear();
+	nextEntityId = 1;
 }
