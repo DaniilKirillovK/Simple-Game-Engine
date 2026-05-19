@@ -73,6 +73,8 @@ public:
 
     virtual void drawMesh(const Mesh* mesh) = 0;
 
+    virtual void loadAssetIcons() = 0;
+
     // Shader compile and linkage
     virtual unsigned int compileShaderSource(const std::string& source, ShaderType type) = 0;
     virtual unsigned int linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader) = 0;

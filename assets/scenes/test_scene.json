@@ -32,8 +32,8 @@
                         0.0,
                         1.0
                     ],
-                    "diffuse_texture_path": "assets/t_grass.jpg",
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "diffuse_texture_path": "assets\\textures\\t_grass.jpg",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": true,
                     "shininess": 32.0,
                     "specular_color": [
@@ -42,7 +42,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "type": "cube"
@@ -113,7 +113,7 @@
                         0.5,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -122,7 +122,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "type": "cube"
@@ -193,7 +193,7 @@
                         0.5,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -202,7 +202,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "type": "cube"
@@ -273,7 +273,7 @@
                         0.5,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -282,7 +282,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "type": "cube"
@@ -353,7 +353,7 @@
                         0.5,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -362,7 +362,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "type": "cube"
@@ -406,22 +406,22 @@
                 "aspect_ratio": 1.7777777910232544,
                 "far_plane": 100.0,
                 "forward": [
-                    0.1901077777147293,
-                    -0.36942142248153687,
-                    -0.9096081256866455
+                    -0.3523296117782593,
+                    -0.5411748886108398,
+                    -0.7635402083396912
                 ],
                 "fov": 45.0,
                 "is_active": true,
                 "near_plane": 0.10000000149011612,
                 "right": [
-                    0.9788500070571899,
-                    -0.0,
-                    0.20457930862903595
+                    0.9079926609992981,
+                    0.0,
+                    -0.418986052274704
                 ],
                 "up": [
-                    0.07557597756385803,
-                    0.9292619824409485,
-                    -0.3616081476211548
+                    -0.22674472630023956,
+                    0.8409101366996765,
+                    -0.4913828372955322
                 ]
             },
             "id": 6,
@@ -430,9 +430,9 @@
             },
             "transform": {
                 "position": [
-                    -3.2696030139923096,
-                    11.720698356628418,
-                    17.69550895690918
+                    8.496599197387695,
+                    16.596996307373047,
+                    17.384092330932617
                 ],
                 "rotation": [
                     0.0,
@@ -624,7 +624,7 @@
                         0.20000000298023224,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -633,7 +633,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "radius": 0.5,
@@ -701,7 +701,7 @@
                         1.0,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -710,7 +710,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "radius": 0.5,
@@ -778,7 +778,7 @@
                         0.20000000298023224,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -787,7 +787,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "radius": 0.5,
@@ -855,7 +855,7 @@
                         0.20000000298023224,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -864,7 +864,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "radius": 0.5,
@@ -906,7 +906,7 @@
         },
         {
             "collider": {
-                "bounciness": 0.8999999761581421,
+                "bounciness": 1.0,
                 "friction": 0.30000001192092896,
                 "is_trigger": false,
                 "offset": [
@@ -932,7 +932,7 @@
                         0.800000011920929,
                         1.0
                     ],
-                    "fragment_shader_path": "Shaders/Default.frag",
+                    "fragment_shader_path": "Shaders\\Default.frag",
                     "has_texture": false,
                     "shininess": 32.0,
                     "specular_color": [
@@ -941,7 +941,7 @@
                         0.5,
                         0.5
                     ],
-                    "vertex_shader_path": "Shaders/Default.vert"
+                    "vertex_shader_path": "Shaders\\Default.vert"
                 },
                 "mesh": {
                     "radius": 0.5,
@@ -951,9 +951,9 @@
                 "visible": true
             },
             "rigidbody": {
-                "is_kinematic": false,
-                "mass": 0.800000011920929,
-                "use_gravity": true,
+                "is_kinematic": true,
+                "mass": 6.300000190734863,
+                "use_gravity": false,
                 "velocity": [
                     0.0,
                     0.0,
@@ -967,7 +967,7 @@
                 "position": [
                     2.0,
                     7.0,
-                    -1.0
+                    -0.7857732772827148
                 ],
                 "rotation": [
                     0.0,

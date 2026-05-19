@@ -81,7 +81,6 @@ std::shared_ptr<Resource<T>> ResourceManager::load(const std::string& path)
             auto resource = it->second;
             if (resource)
             {
-                LOG_RESOURCEMANAGER(std::string("Cache hit: ") + path);
                 return resource;
             }
             else

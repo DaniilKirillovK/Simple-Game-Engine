@@ -26,6 +26,7 @@
 #include "Utils/HierarchyUtils.h"
 #include "Utils/Serialization/SceneSerializer.h"
 #include "libs/imgui/imgui_internal.h"
+#include <Resources/ResourceManager.h>
 
 static const char* debugVertexShaderSource = R"(
     #version 330 core
@@ -296,6 +297,8 @@ void OpenGLRenderAdapter::initImGui()
             g_instance->addLogEntry(level, message);
         }
     });
+
+    AssetsUtils::scanAssetsDirectory("assets", m_currentDirectory, m_currentDirectoryContent);
 
     LOG_INFO("OpenGLRenderAdapter: ImGui initialized");
 }
@@ -569,6 +572,15 @@ void OpenGLRenderAdapter::drawMesh(const Mesh *mesh)
     glBindVertexArray(0);
 }
 
+void OpenGLRenderAdapter::loadAssetIcons()
+{
+    auto folderIconResource = RESOURCE_MANAGER.load<Texture>("assets\\common\\icon_folder.png");
+    auto modelIconResource = RESOURCE_MANAGER.load<Texture>("assets\\common\\icon_model.png");
+
+    m_folderIcon = (ImTextureID)(intptr_t)folderIconResource->get()->m_handle;
+    m_modelIcon = (ImTextureID)(intptr_t)modelIconResource->get()->m_handle;
+}
+
 void OpenGLRenderAdapter::createRenderTexture(int width, int height)
 {
     if (width <= 0 || height <= 0) return;
@@ -644,6 +656,7 @@ void OpenGLRenderAdapter::renderUI()
     if (m_showInspector) renderInspector();
     if (m_showStatistics) renderStatistics();
     if (m_showLogPanel) renderLogPanel();
+    if (m_showAssetBrowser) renderAssetBrowser();
 }
 
 void OpenGLRenderAdapter::renderUIViewport()
@@ -1330,6 +1343,189 @@ void OpenGLRenderAdapter::renderLogPanel()
     ImGui::End();
 }
 
+void OpenGLRenderAdapter::renderAssetBrowser()
+{
+    if (!m_showAssetBrowser) return;
+
+    ImGui::Begin("Asset Browser");
+
+    if (ImGui::ArrowButton("##up", ImGuiDir_Up))
+    {
+        assetBrowserNavigateUp();
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button("Refresh"))
+    {
+        AssetsUtils::scanAssetsDirectory(m_currentDirectory, m_currentDirectory, m_currentDirectoryContent);
+    }
+
+    ImGui::SameLine();
+    ImGui::Text("Path: %s", m_currentDirectory.c_str());
+
+    ImGui::Separator();
+
+    std::string pathToShow = m_currentDirectory;
+    size_t pos = 0;
+    std::string accumulated = "";
+
+    std::vector<std::string> pathParts;
+    std::string temp = m_currentDirectory;
+    while ((pos = temp.find("/")) != std::string::npos)
+    {
+        pathParts.push_back(temp.substr(0, pos));
+        temp.erase(0, pos + 1);
+    }
+    if (!temp.empty()) pathParts.push_back(temp);
+
+    accumulated = "";
+    for (size_t i = 0; i < pathParts.size(); i++)
+    {
+        if (i > 0) accumulated += "/";
+        accumulated += pathParts[i];
+
+        if (ImGui::Button(pathParts[i].c_str()))
+        {
+            AssetsUtils::scanAssetsDirectory(accumulated, m_currentDirectory, m_currentDirectoryContent);
+            break;
+        }
+        ImGui::SameLine();
+        if (i < pathParts.size() - 1)
+        {
+            ImGui::Text("/");
+            ImGui::SameLine();
+        }
+    }
+
+    ImGui::Separator();
+
+    float windowWidth = ImGui::GetContentRegionAvail().x;
+    float itemWidth = 120.0f;
+    int columns = (int)(windowWidth / itemWidth);
+    if (columns < 1) columns = 1;
+
+    ImGui::Columns(columns, nullptr, false);
+
+    for (const auto& asset : m_currentDirectoryContent)
+    {
+        ImGui::BeginGroup();
+
+        if (asset.isDirectory)
+        {
+            if (m_folderIcon)
+            {
+                ImGui::Image(m_folderIcon, ImVec2(80, 80));
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "[FOLDER]");
+            }
+
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+            {
+                if (asset.name == "..")
+                {
+                    assetBrowserNavigateUp();
+                }
+                else
+                {
+                    std::string pathToEnter = asset.path;
+                    AssetsUtils::scanAssetsDirectory(pathToEnter, m_currentDirectory, m_currentDirectoryContent);
+                }
+            }
+        }
+        else if (asset.extension == ".png" || asset.extension == ".jpg" || asset.extension == ".jpeg")
+        {
+            auto textureResource = RESOURCE_MANAGER.load<Texture>(asset.path);
+            if (textureResource && textureResource->isValid())
+            {
+                Texture* tex = textureResource->get();
+                unsigned int textureID = tex->m_handle;
+
+                ImGui::Image((ImTextureID)(intptr_t)textureID, ImVec2(80, 80));
+
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::SetTooltip("Size: %dx%d\nPath: %s", tex->m_width, tex->m_height, asset.path.c_str());
+                }
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "[TEX]");
+            }
+        }
+        else if (asset.extension == ".obj" || asset.extension == ".fbx")
+        {
+            if (m_modelIcon)
+                ImGui::Image(m_modelIcon, ImVec2(80, 80));
+            else
+                ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "[MODEL]");
+        }
+
+        std::string displayName = asset.name;
+        if (displayName.length() > 20) 
+        {
+            displayName = displayName.substr(0, 17) + "...";
+        }
+        ImGui::TextWrapped("%s", displayName.c_str());
+
+        if (!asset.isDirectory)
+        {
+            std::string buttonLabel = "Use##" + asset.path;
+            if (ImGui::Button(buttonLabel.c_str()))
+            {
+                m_currentAssetPath = asset.path;
+
+                if (asset.extension == ".png" || asset.extension == ".jpg" || asset.extension == ".jpeg")
+                {
+                    auto textureResource = RESOURCE_MANAGER.load<Texture>(asset.path);
+                    if (textureResource && textureResource->isValid())
+                    {
+                        m_selectedTexture = textureResource->get();
+                    }
+                }
+
+                else if (asset.extension == ".obj" || asset.extension == ".fbx")
+                {
+                    auto meshResource = RESOURCE_MANAGER.load<Mesh>(asset.path);
+                    if (meshResource && meshResource->isValid())
+                    {
+                        m_selectedMesh = meshResource->get();
+                    }
+                }
+            }
+        }
+
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("%s", asset.path.c_str());
+        }
+
+        ImGui::EndGroup();
+        ImGui::NextColumn();
+    }
+
+    ImGui::Columns(1);
+
+    ImGui::Separator();
+    ImGui::Text("Selected Asset:");
+    if (!m_currentAssetPath.empty())
+    {
+        ImGui::Text("%s", m_currentAssetPath.c_str());
+
+        if (ImGui::Button("Create Object from Asset"))
+        {
+
+        }
+    }
+    else
+    {
+        ImGui::Text("None selected");
+    }
+
+    ImGui::End();
+}
+
 void OpenGLRenderAdapter::SizeCallback(ImGuiSizeCallbackData* data)
 {
     float aspectRatio = *(float*)data->UserData;
@@ -1705,6 +1901,15 @@ void OpenGLRenderAdapter::loadLastScene()
     if (std::filesystem::exists(m_currentScenePath))
     {
         SceneSerializer::loadScene(*this, *m_world, m_currentScenePath);
+    }
+}
+
+void OpenGLRenderAdapter::assetBrowserNavigateUp()
+{
+    if (m_currentDirectory != "assets" && m_currentDirectory != ".")
+    {
+        std::filesystem::path parent = std::filesystem::path(m_currentDirectory).parent_path();
+        AssetsUtils::scanAssetsDirectory(parent.string(), m_currentDirectory, m_currentDirectoryContent);
     }
 }
 

@@ -53,7 +53,9 @@ void TextureLoader::registerLoader(IRenderAdapter* renderAdapter)
     m_renderAdapter = renderAdapter;
 
     RESOURCE_MANAGER.registerLoader<Texture>(&textureLoad, 0);
-    LOG_INFO("MeshLoader registered with ResourceManager");
+    renderAdapter->loadAssetIcons();
+
+    LOG_INFO("TextureLoader registered with ResourceManager");
 }
 
 void TextureLoader::flipVertically(unsigned char* pixels, int width, int height, int channels) 

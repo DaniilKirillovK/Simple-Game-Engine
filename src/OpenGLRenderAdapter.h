@@ -8,9 +8,12 @@
 #include "Entity.h"
 #include "ComponentPool.h"
 #include "Logger.h"
+#include <Utils/Assets/AssetsUtils.h>
 
 class Transform;
 class Hierarchy;
+class Texture;
+class Mesh;
 
 struct DebugVertex
 {
@@ -88,6 +91,8 @@ private:
 
     virtual void drawMesh(const Mesh* mesh) override;
 
+    virtual void loadAssetIcons() override;
+
     // Callbacks
     std::function<void(bool)> m_onToggleDebugCallback;
     std::function<void()> m_onPlayCallback;
@@ -107,6 +112,7 @@ private:
     void renderTransformEditor(Transform& transform);
     void renderToolbar(ImVec2 position, ImVec2 size);
     void renderLogPanel();
+    void renderAssetBrowser();
 
     void renderMainMenuBar();
     void renderAboutWindow();
@@ -142,6 +148,9 @@ private:
     std::string m_currentScenePath = "assets/scenes/test_scene.json";
     bool m_autoSaveEnabled = true;
 
+    // Asset Browser
+    void assetBrowserNavigateUp();
+
     World* m_world;
     bool m_isPlaying = false;
 
@@ -152,6 +161,7 @@ private:
     bool m_showViewport = true;
     bool m_showLogPanel = true;
     bool m_showAbout = false;
+    bool m_showAssetBrowser = true;
 
     bool m_showLoadScenePanel = false;
     bool m_showSaveAsScenePanel = false;
@@ -210,6 +220,15 @@ private:
     bool m_showWarning = true;
     bool m_showError = true;
     bool m_showResourceManager = true;
+
+    // AssetBrowser
+    std::vector<AssetInfo> m_currentDirectoryContent;
+    std::string m_currentDirectory = "assets";
+    std::string m_currentAssetPath = "";
+    ImTextureID m_folderIcon = nullptr;
+    ImTextureID m_modelIcon = nullptr;
+    Mesh* m_selectedMesh = nullptr;
+    Texture* m_selectedTexture = nullptr;
 
     ImVec2 m_viewportSize = ImVec2(0, 0);
     bool m_viewportHovered = false;
