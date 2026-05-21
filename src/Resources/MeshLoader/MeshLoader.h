@@ -27,10 +27,10 @@ public:
     void registerLoader();
 
 private:
-    std::unique_ptr<Mesh> loadModelInner(const aiScene* scene);
-    std::vector<std::unique_ptr<Mesh>> loadAllMeshesInner(const aiScene* scene);
+    std::unique_ptr<Mesh> loadModelInner(const aiScene* scene, const std::string& filepath);
+    std::vector<std::unique_ptr<Mesh>> loadAllMeshesInner(const aiScene* scene, const std::string& filepath);
 
-    std::unique_ptr<Mesh> processMesh(struct aiMesh* mesh);
+    std::unique_ptr<Mesh> processMesh(struct aiMesh* mesh, const std::string& filepath);
 
     std::string extractDirectory(const std::string& filepath);
 };

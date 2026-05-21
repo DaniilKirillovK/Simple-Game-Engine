@@ -406,22 +406,22 @@
                 "aspect_ratio": 1.7777777910232544,
                 "far_plane": 100.0,
                 "forward": [
-                    0.7491796612739563,
-                    -0.4240928590297699,
-                    -0.5087976455688477
+                    0.872836172580719,
+                    -0.34350088238716125,
+                    -0.3466470241546631
                 ],
                 "fov": 45.0,
                 "is_active": true,
                 "near_plane": 0.10000000149011612,
                 "right": [
-                    0.5618231892585754,
+                    0.3691062927246094,
                     -0.0,
-                    0.8272572159767151
+                    0.9293872117996216
                 ],
                 "up": [
-                    0.3508339524269104,
-                    0.9056187868118286,
-                    -0.238265261054039
+                    0.3192453384399414,
+                    0.9391523599624634,
+                    -0.12678833305835724
                 ]
             },
             "id": 6,
@@ -430,9 +430,9 @@
             },
             "transform": {
                 "position": [
-                    -16.354938507080078,
-                    12.56577205657959,
-                    13.349021911621094
+                    -24.899765014648438,
+                    19.189271926879883,
+                    20.7233829498291
                 ],
                 "rotation": [
                     0.0,
@@ -932,8 +932,9 @@
                         0.800000011920929,
                         1.0
                     ],
+                    "diffuse_texture_path": "assets\\textures\\t_cake.png",
                     "fragment_shader_path": "Shaders\\Default.frag",
-                    "has_texture": false,
+                    "has_texture": true,
                     "shininess": 32.0,
                     "specular_color": [
                         0.5,
@@ -1393,6 +1394,166 @@
                     1.2000000476837158,
                     1.2000000476837158,
                     1.2000000476837158
+                ]
+            }
+        },
+        {
+            "collider": {
+                "bounciness": 0.5,
+                "friction": 0.5,
+                "half_size": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "is_trigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "type": "box"
+            },
+            "id": 20,
+            "mesh_renderer": {
+                "material": {
+                    "ambient_color": [
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224
+                    ],
+                    "diffuse_color": [
+                        0.800000011920929,
+                        0.800000011920929,
+                        0.800000011920929,
+                        1.0
+                    ],
+                    "diffuse_texture_path": "assets\\textures\\t_grass.jpg",
+                    "fragment_shader_path": "Shaders/Default.frag",
+                    "has_texture": true,
+                    "shininess": 32.0,
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "vertex_shader_path": "Shaders/Default.vert"
+                },
+                "mesh": {
+                    "type": "cube"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "rigidbody": {
+                "is_kinematic": false,
+                "mass": 1.0,
+                "use_gravity": true,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "tag": {
+                "name": "Cube"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    3.509418249130249,
+                    5.439673900604248
+                ],
+                "rotation": [
+                    38.60612487792969,
+                    -17.029226303100586,
+                    -24.960939407348633
+                ],
+                "scale": [
+                    0.9999935030937195,
+                    0.9999988079071045,
+                    0.9999946355819702
+                ]
+            }
+        },
+        {
+            "id": 21,
+            "tag": {
+                "name": "Empty"
+            },
+            "transform": {
+                "position": [
+                    -2.637829065322876,
+                    3.8361592292785645,
+                    4.005214214324951
+                ],
+                "rotation": [
+                    87.05024719238281,
+                    -11.303916931152344,
+                    -59.35144805908203
+                ],
+                "scale": [
+                    0.9999974370002747,
+                    1.0000016689300537,
+                    1.0000014305114746
+                ]
+            }
+        },
+        {
+            "id": 22,
+            "mesh_renderer": {
+                "material": {
+                    "ambient_color": [
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224,
+                        0.20000000298023224
+                    ],
+                    "diffuse_color": [
+                        0.800000011920929,
+                        0.800000011920929,
+                        0.800000011920929,
+                        1.0
+                    ],
+                    "diffuse_texture_path": "assets\\textures\\t_cake.png",
+                    "fragment_shader_path": "Shaders/Default.frag",
+                    "has_texture": true,
+                    "shininess": 32.0,
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "vertex_shader_path": "Shaders/Default.vert"
+                },
+                "mesh": {
+                    "path": "assets\\models\\cake.obj",
+                    "type": "model"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "tag": {
+                "name": "Cake"
+            },
+            "transform": {
+                "position": [
+                    4.888047218322754,
+                    10.711381912231445,
+                    7.3343000411987305
+                ],
+                "rotation": [
+                    79.71782684326172,
+                    -52.83489990234375,
+                    -51.32553482055664
+                ],
+                "scale": [
+                    0.09999994933605194,
+                    0.10000009834766388,
+                    0.10000032186508179
                 ]
             }
         }

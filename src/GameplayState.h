@@ -4,6 +4,8 @@
 #include <string>
 #include "IRenderAdapter.h"
 
+struct Mesh;
+
 class GameplayState : public IGameState 
 {
 public:
@@ -14,6 +16,8 @@ public:
     virtual void render() override;
 
 private:
+    void setupEditorCallbacks();
+
     void enterPlayMode();
     void exitPlayMode();
 
@@ -21,6 +25,11 @@ private:
 
     void saveSceneState();
     void restoreSceneState();
+
+    void createEmptyEntity();
+    void createCubeEntity();
+    void createSphereEntity();
+    void createFromAsset(Mesh* mesh, const std::string& path);
 
     std::string m_savedScenePath;
 

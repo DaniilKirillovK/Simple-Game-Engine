@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include "InputHandler.h"
 #include "Resources/ShaderLoader/ShaderProgram.h"
+#include "Entity.h"
 
 class Material;
 class Mesh;
@@ -85,4 +86,10 @@ public:
     virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) = 0;
     virtual void setOnPlayCallback(std::function<void()> callback) = 0;
     virtual void setOnStopCallback(std::function<void()> callback) = 0;
+    virtual void setOnCreateCubeCallback(std::function<void()> callback) = 0;
+    virtual void setOnCreateSphereCallback(std::function<void()> callback) = 0;
+    virtual void setOnCreateEmptyCallback(std::function<void()> callback) = 0;
+    virtual void setOnCreateFromAssetCallback(std::function<void(Mesh*, const std::string&)> callback) = 0;
+
+    virtual void setSelectedEntity(EntityId entity) = 0;
 };

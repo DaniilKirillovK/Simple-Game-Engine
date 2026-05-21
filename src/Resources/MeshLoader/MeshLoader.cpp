@@ -19,7 +19,7 @@ std::unique_ptr<Mesh> MeshLoader::loadModel(const std::string& filepath)
              " (meshes: " + std::to_string(scene->mNumMeshes) + 
              ", materials: " + std::to_string(scene->mNumMaterials) + ")");
 
-    return loadModelInner(scene);
+    return loadModelInner(scene, filepath);
 }
 
 std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshes(const std::string& filepath)
@@ -31,16 +31,16 @@ std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshes(const std::string& 
     LOG_INFO(std::string("Loading all meshes: ") + filepath + 
              " (meshes: " + std::to_string(scene->mNumMeshes) + ")");
 
-    return loadAllMeshesInner(scene);
+    return loadAllMeshesInner(scene, filepath);
 }
 
 
-std::unique_ptr<Mesh> MeshLoader::loadModelInner(const aiScene* scene)
+std::unique_ptr<Mesh> MeshLoader::loadModelInner(const aiScene* scene, const std::string& filepath)
 {
-    return processMesh(scene->mMeshes[0]);
+    return processMesh(scene->mMeshes[0], filepath);
 }
 
-std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshesInner(const aiScene* scene)
+std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshesInner(const aiScene* scene, const std::string& filepath)
 {
     std::vector<std::unique_ptr<Mesh>> meshes;
     
@@ -48,7 +48,7 @@ std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshesInner(const aiScene*
 
     for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
     {
-        meshes.push_back(processMesh(scene->mMeshes[i]));
+        meshes.push_back(processMesh(scene->mMeshes[i], filepath));
     }
 
     LOG_INFO(std::string("Loaded ") + std::to_string(meshes.size()) + " meshes from scene");
@@ -56,7 +56,7 @@ std::vector<std::unique_ptr<Mesh>> MeshLoader::loadAllMeshesInner(const aiScene*
     return meshes;
 }
 
-std::unique_ptr<Mesh> MeshLoader::processMesh(struct aiMesh* mesh)
+std::unique_ptr<Mesh> MeshLoader::processMesh(struct aiMesh* mesh, const std::string& filepath)
 {
     auto result = std::make_unique<Mesh>();
     result->type = MeshType::Custom;
@@ -128,6 +128,7 @@ std::unique_ptr<Mesh> MeshLoader::processMesh(struct aiMesh* mesh)
 
     result->vertexCount = result->vertices.size();
     result->indexCount = result->indices.size();
+    result->path = filepath;
 
     LOG_INFO(std::string("Processed mesh: ") + 
              std::to_string(result->vertexCount) + " vertices, " +
@@ -164,12 +165,12 @@ std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
     else if (meshCount == 1)
     {
         LOG_INFO(std::string("Single mesh detected, using LoadModelInternal: ") + filepath);
-        return loadModelInner(scene);  // 
+        return loadModelInner(scene, filepath);  // 
     }
     else
     {
         LOG_INFO(std::string("Multiple meshes detected (") + std::to_string(meshCount) + "), using LoadAllMeshesInternal: " + filepath);
-        auto meshes = loadAllMeshesInner(scene);  // 
+        auto meshes = loadAllMeshesInner(scene, filepath);  // 
         
         if (meshes.empty())
         {

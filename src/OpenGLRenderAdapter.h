@@ -52,10 +52,17 @@ public:
     virtual void endImGuiFrame() override;
     virtual void shutdownImGui() override;
 
+    virtual void setSelectedEntity(EntityId entity) override { m_selectedEntity = entity; };
+
     // Callbacks
     virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) override { m_onToggleDebugCallback = callback; }
     virtual void setOnPlayCallback(std::function<void()> callback) { m_onPlayCallback = callback; }
     virtual void setOnStopCallback(std::function<void()> callback) { m_onStopCallback = callback; }
+
+    virtual void setOnCreateCubeCallback(std::function<void()> callback) override { m_onCreateCubeCallback = callback; }
+    virtual void setOnCreateSphereCallback(std::function<void()> callback) override { m_onCreateSphereCallback = callback; }
+    virtual void setOnCreateEmptyCallback(std::function<void()> callback) override { m_onCreateEmptyCallback = callback; }
+    virtual void setOnCreateFromAssetCallback(std::function<void(Mesh*, const std::string&)> callback) override { m_onCreateFromAssetCallback = callback; }
 
 private:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -97,6 +104,11 @@ private:
     std::function<void(bool)> m_onToggleDebugCallback;
     std::function<void()> m_onPlayCallback;
     std::function<void()> m_onStopCallback;
+
+    std::function<void()> m_onCreateCubeCallback;
+    std::function<void()> m_onCreateSphereCallback;
+    std::function<void()> m_onCreateEmptyCallback;
+    std::function<void(Mesh*, const std::string&)> m_onCreateFromAssetCallback;
 
     void createRenderTexture(int width, int height);
     void beginRenderToTexture();

@@ -1110,6 +1110,28 @@ void OpenGLRenderAdapter::renderMainMenuBar()
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Create"))
+        {
+            if (ImGui::MenuItem("Empty Entity"))
+            {
+                if (m_onCreateEmptyCallback) m_onCreateEmptyCallback();
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Cube"))
+            {
+                if (m_onCreateCubeCallback) m_onCreateCubeCallback();
+            }
+
+            if (ImGui::MenuItem("Sphere"))
+            {
+                if (m_onCreateSphereCallback) m_onCreateSphereCallback();
+            }
+
+            ImGui::EndMenu();
+        }
+
         if (ImGui::BeginMenu("View"))
         {
             ImGui::MenuItem("Scene Hierarchy", nullptr, &m_showHierarchy);
@@ -1530,9 +1552,40 @@ void OpenGLRenderAdapter::renderAssetBrowser()
     {
         ImGui::Text("%s", m_currentAssetPath.c_str());
 
-        if (ImGui::Button("Create Object from Asset"))
+        if (std::filesystem::path(m_currentAssetPath).extension().string() == ".obj"
+            || std::filesystem::path(m_currentAssetPath).extension().string() == ".fbx")
         {
-
+            ImGui::Text("Type: 3D Model");
+            ImGui::Text("Vertices: %d", m_selectedMesh->vertices.size());
+            ImGui::Text("Indices: %d", m_selectedMesh->indices.size());
+            if (ImGui::Button("Create Object from Asset"))
+            {
+                if (m_onCreateFromAssetCallback)
+                {
+                    m_onCreateFromAssetCallback(m_selectedMesh, m_currentAssetPath);
+                }
+            }
+        }
+        else if (std::filesystem::path(m_currentAssetPath).extension().string() == ".png"
+            || std::filesystem::path(m_currentAssetPath).extension().string() == ".jpg")
+        {
+            ImGui::Text("Type: Texture");
+            ImGui::Text("Size: %dx%d", m_selectedTexture->m_width, m_selectedTexture->m_height);
+            if (ImGui::Button("Apply to Selected Object"))
+            {
+                if (m_selectedEntity != -1 && m_world)
+                {
+                    if (MeshRenderer* renderer = m_world->getComponent<MeshRenderer>(m_selectedEntity))
+                    {
+                        if (renderer->material)
+                        {
+                            renderer->material->diffuseTexture = m_selectedTexture;
+                            renderer->material->hasTexture = true;
+                            LOG_INFO("Texture applied to entity %d", m_selectedEntity);
+                        }
+                    }
+                }
+            }
         }
     }
     else
