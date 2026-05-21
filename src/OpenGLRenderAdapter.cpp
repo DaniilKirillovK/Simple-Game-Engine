@@ -27,6 +27,7 @@
 #include "Utils/Serialization/SceneSerializer.h"
 #include "libs/imgui/imgui_internal.h"
 #include <Resources/ResourceManager.h>
+#include "MeshFactory.h"
 
 static const char* debugVertexShaderSource = R"(
     #version 330 core
@@ -1017,6 +1018,99 @@ void OpenGLRenderAdapter::renderInspector()
                 camera->aspectRatio = 16.0f / 9.0f;
                 camera->nearPlane = 0.1f;
                 camera->farPlane = 100.0f;
+            }
+        }
+    }
+
+    if (ImGui::CollapsingHeader("+ Add Component", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        // Tag
+        if (!m_world->hasComponent<Tag>(m_selectedEntity))
+        {
+            if (ImGui::MenuItem("Add Tag"))
+            {
+                m_world->addComponent<Tag>(m_selectedEntity, Tag{});
+                LOG_INFO("Added Tag component to entity %d", m_selectedEntity);
+            }
+        }
+
+        // MeshRenderer
+        if (!m_world->hasComponent<MeshRenderer>(m_selectedEntity))
+        {
+            if (ImGui::MenuItem("Add Mesh Renderer"))
+            {
+                auto vertShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
+                auto fragShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
+
+                Mesh* cubeMesh = MeshFactory::createCube();
+
+                Material* defaultMaterial = new Material{
+                    glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+                    vertShader->get(),
+                    fragShader->get(),
+                    *this
+                };
+
+                m_world->addComponent<MeshRenderer>(m_selectedEntity, MeshRenderer{ cubeMesh, defaultMaterial });
+                LOG_INFO("Added MeshRenderer component to entity %d", m_selectedEntity);
+            }
+        }
+
+        // Light
+        if (!m_world->hasComponent<Light>(m_selectedEntity))
+        {
+            if (ImGui::MenuItem("Add Light"))
+            {
+                m_world->addComponent<Light>(m_selectedEntity, Light{});
+                LOG_INFO("Added Light component to entity %d", m_selectedEntity);
+            }
+        }
+
+        // Camera
+        if (!m_world->hasComponent<Camera>(m_selectedEntity))
+        {
+            if (ImGui::MenuItem("Add Camera"))
+            {
+                Camera cam;
+                cam.aspectRatio = 16.0f / 9.0f;
+                cam.fov = 45.0f;
+                cam.nearPlane = 0.1f;
+                cam.farPlane = 100.0f;
+                cam.isActive = true;
+
+                // Если это первая камера, делаем её активной
+                auto cameras = m_world->getEntitiesWithComponent<Camera>();
+                if (cameras.empty())
+                {
+                    cam.isActive = true;
+                }
+                else
+                {
+                    cam.isActive = false;
+                }
+
+                m_world->addComponent<Camera>(m_selectedEntity, cam);
+                LOG_INFO("Added Camera component to entity %d", m_selectedEntity);
+            }
+        }
+
+        // Rigidbody
+        if (!m_world->hasComponent<Rigidbody>(m_selectedEntity))
+        {
+            if (ImGui::MenuItem("Add Rigidbody"))
+            {
+                m_world->addComponent<Rigidbody>(m_selectedEntity, Rigidbody{});
+                LOG_INFO("Added Rigidbody component to entity %d", m_selectedEntity);
+            }
+        }
+
+        // Collider
+        if (!m_world->hasComponent<Collider>(m_selectedEntity))
+        {
+            if (ImGui::MenuItem("Add Collider"))
+            {
+                m_world->addComponent<Collider>(m_selectedEntity, Collider{});
+                LOG_INFO("Added Collider component to entity %d", m_selectedEntity);
             }
         }
     }
