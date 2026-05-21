@@ -737,19 +737,14 @@ void OpenGLRenderAdapter::renderUIViewport()
                         glm::mat4 parentWorldMatrix = parentTransform->worldMatrix;
 
                         glm::mat4 inverseParentMatrix = glm::inverse(parentWorldMatrix);
-
                         glm::vec4 localPos4 = inverseParentMatrix * glm::vec4(newWorldPosition, 1.0f);
                         glm::vec3 newLocalPosition = glm::vec3(localPos4);
-
-                        glm::quat parentWorldRotation = glm::quat_cast(parentWorldMatrix);
-                        glm::quat inverseParentRotation = glm::inverse(parentWorldRotation);
-                        glm::quat newLocalRotation = inverseParentRotation * newWorldRotation;
 
                         glm::vec3 parentScale = parentTransform->scale;
                         glm::vec3 newLocalScale = newScale;
 
                         entityTransform->position = newLocalPosition;
-                        entityTransform->rotation = newLocalRotation;
+                        entityTransform->rotation = newWorldRotation;
                         entityTransform->scale = newLocalScale;
                     }
                     else if (newWorldPosition.length() > 0.5f)
@@ -988,6 +983,44 @@ void OpenGLRenderAdapter::renderInspector()
         }
     }
 
+    if (Camera* camera = m_world->getComponent<Camera>(m_selectedEntity))
+    {
+        if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            if (ImGui::Checkbox("Active", &camera->isActive))
+            {
+                if (camera->isActive)
+                {
+                    auto cameras = m_world->getEntitiesWithComponent<Camera>();
+                    for (auto& [entity, cam] : cameras)
+                    {
+                        if (entity != m_selectedEntity)
+                        {
+                            cam->isActive = false;
+                        }
+                    }
+                }
+            }
+
+            ImGui::Separator();
+
+            ImGui::DragFloat("Field of View", &camera->fov, 0.5f, 1.0f, 120.0f);
+            ImGui::DragFloat("Aspect Ratio", &camera->aspectRatio, 0.01f, 0.1f, 3.0f);
+            ImGui::DragFloat("Near Plane", &camera->nearPlane, 0.01f, 0.01f, 10.0f);
+            ImGui::DragFloat("Far Plane", &camera->farPlane, 1.0f, 10.0f, 1000.0f);
+
+            ImGui::Separator();
+
+            if (ImGui::Button("Reset to Default"))
+            {
+                camera->fov = 45.0f;
+                camera->aspectRatio = 16.0f / 9.0f;
+                camera->nearPlane = 0.1f;
+                camera->farPlane = 100.0f;
+            }
+        }
+    }
+
     ImGui::End();
 }
 
@@ -1019,21 +1052,11 @@ void OpenGLRenderAdapter::renderStatistics()
     if (m_world)
     {
         int totalEntities = 0;
-        int meshRenderersCount = 0;
-        int rigidbodiesCount = 0;
 
         auto& transforms = m_world->getComponentPool<Transform>();
         totalEntities = transforms.getAll().size();
 
-        auto& meshRenderers = m_world->getComponentPool<MeshRenderer>();
-        meshRenderersCount = meshRenderers.getAll().size();
-
-        auto& rigidbodies = m_world->getComponentPool<Rigidbody>();
-        rigidbodiesCount = rigidbodies.getAll().size();
-
         ImGui::Text("Total Entities: %d", totalEntities);
-        ImGui::Text("Mesh Renderers: %d", meshRenderersCount);
-        ImGui::Text("Rigidbodies: %d", rigidbodiesCount);
     }
 
     ImGui::Separator();
@@ -1094,6 +1117,7 @@ void OpenGLRenderAdapter::renderMainMenuBar()
             ImGui::MenuItem("Statistics", nullptr, &m_showStatistics);
             ImGui::MenuItem("Viewport", nullptr, &m_showViewport);
             ImGui::MenuItem("Log Console", nullptr, &m_showLogPanel);
+            ImGui::MenuItem("Asset Browser", nullptr, &m_showAssetBrowser);
 
             ImGui::EndMenu();
         }
@@ -1103,13 +1127,6 @@ void OpenGLRenderAdapter::renderMainMenuBar()
             if (ImGui::MenuItem("About"))
             {
                 m_showAbout = true;
-            }
-
-            ImGui::Separator();
-
-            if (ImGui::MenuItem("Documentation"))
-            {
-                //
             }
 
             ImGui::EndMenu();
@@ -1711,6 +1728,9 @@ void OpenGLRenderAdapter::setupOpenGLState()
 
 void OpenGLRenderAdapter::onFramebufferResize(int width, int height)
 {
+    if (width < 1) width = 1;
+    if (height < 1) height = 1;
+
     m_width = width;
     m_height = height;
 

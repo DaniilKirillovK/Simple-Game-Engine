@@ -54,11 +54,6 @@ void PhysicsSystem::update(World& world, float deltaTime)
 
         m_accumulator -= m_fixedTimestep;
     }
-
-    //if (InputHandler::getInstance().isActionJustPressed("ToggleDebug"))
-    //{
-    //    toggleDebugRendering();
-    //}
 }
 
 void PhysicsSystem::setEnabled(bool isEnabled)
@@ -184,25 +179,27 @@ bool PhysicsSystem::checkCollision(const Collider& a, const Transform& transform
         glm::vec3 centerB = (minB + maxB) * 0.5f;
         glm::vec3 delta = centerB - centerA;
 
-        glm::vec3 overlap;
-        overlap.x = (maxA.x - minA.x) * 0.5f + (maxB.x - minB.x) * 0.5f - std::abs(delta.x);
-        overlap.y = (maxA.y - minA.y) * 0.5f + (maxB.y - minB.y) * 0.5f - std::abs(delta.y);
-        overlap.z = (maxA.z - minA.z) * 0.5f + (maxB.z - minB.z) * 0.5f - std::abs(delta.z);
+        glm::vec3 halfA = (maxA - minA) * 0.5f;
+        glm::vec3 halfB = (maxB - minB) * 0.5f;
 
-        if (overlap.x < overlap.y && overlap.x < overlap.z) 
+        float overlapX = halfA.x + halfB.x - std::abs(delta.x);
+        float overlapY = halfA.y + halfB.y - std::abs(delta.y);
+        float overlapZ = halfA.z + halfB.z - std::abs(delta.z);
+
+        if (overlapX <= overlapY && overlapX <= overlapZ)
         {
-            outInfo.normal = glm::vec3(delta.x > 0 ? 1 : -1, 0, 0);
-            outInfo.penetrationDepth = overlap.x;
+            outInfo.normal = glm::vec3((delta.x > 0) ? 1.0f : -1.0f, 0.0f, 0.0f);
+            outInfo.penetrationDepth = overlapX;
         }
-        else if (overlap.y < overlap.x && overlap.y < overlap.z) 
+        else if (overlapY <= overlapX && overlapY <= overlapZ)
         {
-            outInfo.normal = glm::vec3(0, delta.y > 0 ? 1 : -1, 0);
-            outInfo.penetrationDepth = overlap.y;
+            outInfo.normal = glm::vec3(0.0f, (delta.y > 0) ? 1.0f : -1.0f, 0.0f);
+            outInfo.penetrationDepth = overlapY;
         }
-        else 
+        else
         {
-            outInfo.normal = glm::vec3(0, 0, delta.z > 0 ? 1 : -1);
-            outInfo.penetrationDepth = overlap.z;
+            outInfo.normal = glm::vec3(0.0f, 0.0f, (delta.z > 0) ? 1.0f : -1.0f);
+            outInfo.penetrationDepth = overlapZ;
         }
 
         outInfo.contactPoint = (centerA + centerB) * 0.5f;
@@ -232,28 +229,62 @@ bool PhysicsSystem::checkCollision(const Collider& a, const Transform& transform
     // Box vs Sphere 
     if (a.type == ColliderType::Box && b.type == ColliderType::Sphere) 
     {
-        glm::vec3 minA = a.getWorldMin(transformA.position);
-        glm::vec3 maxA = a.getWorldMax(transformA.position);
-        glm::vec3 centerB = b.getCenter(transformB.position);
-        float radiusB = b.radius;
+        glm::vec3 boxMin = a.getWorldMin(transformA.getWorldPosition());
+        glm::vec3 boxMax = a.getWorldMax(transformA.getWorldPosition());
+        glm::vec3 sphereCenter = b.getCenter(transformB.getWorldPosition());
+        float sphereRadius = b.radius;
 
         glm::vec3 closestPoint;
-        closestPoint.x = glm::clamp(centerB.x, minA.x, maxA.x);
-        closestPoint.y = glm::clamp(centerB.y, minA.y, maxA.y);
-        closestPoint.z = glm::clamp(centerB.z, minA.z, maxA.z);
+        closestPoint.x = std::max(boxMin.x, std::min(sphereCenter.x, boxMax.x));
+        closestPoint.y = std::max(boxMin.y, std::min(sphereCenter.y, boxMax.y));
+        closestPoint.z = std::max(boxMin.z, std::min(sphereCenter.z, boxMax.z));
 
-        glm::vec3 delta = centerB - closestPoint;
+        glm::vec3 delta = sphereCenter - closestPoint;
         float distanceSq = glm::dot(delta, delta);
-        float radiusSq = radiusB * radiusB;
+        float radiusSq = sphereRadius * sphereRadius;
 
-        if (distanceSq < radiusSq) 
+        if (distanceSq < radiusSq)
         {
-            float distance = sqrt(distanceSq);
-            outInfo.normal = glm::normalize(delta);
-            outInfo.penetrationDepth = radiusB - distance;
+            float distance = std::sqrt(distanceSq);
+
+            if (distance > 0.0001f)
+            {
+                outInfo.normal = delta / distance;
+            }
+            else
+            {
+                float dx = sphereCenter.x - boxMin.x;
+                float dy = sphereCenter.y - boxMin.y;
+                float dz = sphereCenter.z - boxMin.z;
+                float halfX = (boxMax.x - boxMin.x) * 0.5f;
+                float halfY = (boxMax.y - boxMin.y) * 0.5f;
+                float halfZ = (boxMax.z - boxMin.z) * 0.5f;
+
+                glm::vec3 centerBox = (boxMin + boxMax) * 0.5f;
+                glm::vec3 localPos = sphereCenter - centerBox;
+
+                if (std::abs(localPos.x) > std::abs(localPos.y) &&
+                    std::abs(localPos.x) > std::abs(localPos.z))
+                {
+                    outInfo.normal = glm::vec3(glm::sign(localPos.x), 0, 0);
+                }
+                else if (std::abs(localPos.y) > std::abs(localPos.x) &&
+                    std::abs(localPos.y) > std::abs(localPos.z))
+                {
+                    outInfo.normal = glm::vec3(0, glm::sign(localPos.y), 0);
+                }
+                else
+                {
+                    outInfo.normal = glm::vec3(0, 0, glm::sign(localPos.z));
+                }
+            }
+
+            outInfo.penetrationDepth = sphereRadius - distance;
             outInfo.contactPoint = closestPoint;
+
             return true;
         }
+
         return false;
     }
 
@@ -269,31 +300,34 @@ bool PhysicsSystem::checkCollision(const Collider& a, const Transform& transform
 void PhysicsSystem::resolveCollision(CollisionInfo& info, Rigidbody& rbA, Rigidbody& rbB, Transform& transformA, Transform& transformB)
 {
     float totalInvMass = rbA.invMass + rbB.invMass;
-    if (totalInvMass > 0.0f) 
-    {
-        float correctionA = info.penetrationDepth * (rbA.invMass / totalInvMass);
-        float correctionB = info.penetrationDepth * (rbB.invMass / totalInvMass);
+    if (totalInvMass <= 0.0f) return;
 
-        transformA.position -= info.normal * correctionA;
-        transformB.position += info.normal * correctionB;
+    glm::vec3 normal = glm::normalize(info.normal);
+
+    glm::vec3 delta = transformB.position - transformA.position;
+    float dot = glm::dot(normal, delta);
+
+    if (dot < 0)
+    {
+        normal = -normal;
     }
 
-    glm::vec3 relativeVelocity = rbB.velocity - rbA.velocity;
-    float velocityAlongNormal = glm::dot(relativeVelocity, info.normal);
+    float correctionA = info.penetrationDepth * (rbA.invMass / totalInvMass);
+    float correctionB = info.penetrationDepth * (rbB.invMass / totalInvMass);
 
-    if (velocityAlongNormal < 0.0f) 
+    transformA.position -= normal * correctionA;
+    transformB.position += normal * correctionB;
+
+    glm::vec3 relativeVelocity = rbB.velocity - rbA.velocity;
+    float velocityAlongNormal = glm::dot(relativeVelocity, normal);
+
+    if (velocityAlongNormal < 0.0f)
     {
         float restitution = 0.5f;
-        float impulseMagnitude = (1.0f + restitution) * velocityAlongNormal / totalInvMass;
-        glm::vec3 impulse = info.normal * impulseMagnitude;
+        float impulseMagnitude = -(1.0f + restitution) * velocityAlongNormal / totalInvMass;
+        glm::vec3 impulse = normal * impulseMagnitude;
 
-        if (!rbA.isKinematic) 
-        {
-            rbA.velocity += impulse * rbA.invMass;
-        }
-        if (!rbB.isKinematic) 
-        {
-            rbB.velocity -= impulse * rbB.invMass;
-        }
+        rbA.velocity -= impulse * rbA.invMass;
+        rbB.velocity += impulse * rbB.invMass;
     }
 }

@@ -39,14 +39,16 @@ void HierarchyUtils::removeFromParent(World* world, EntityId child)
     Hierarchy* childHierarchy = world->getComponent<Hierarchy>(child);
     EntityId oldParent = childHierarchy->parent;
 
-    if (oldParent != -1 && world->hasComponent<Hierarchy>(oldParent)) {
+    if (oldParent != -1 && world->hasComponent<Hierarchy>(oldParent)) 
+    {
         Hierarchy* parentHierarchy = world->getComponent<Hierarchy>(oldParent);
         parentHierarchy->removeChild(child);
     }
 
     childHierarchy->parent = -1;
 
-    if (world->hasComponent<Transform>(child)) {
+    if (world->hasComponent<Transform>(child)) 
+    {
         Transform* transform = world->getComponent<Transform>(child);
         transform->markDirty();
     }
