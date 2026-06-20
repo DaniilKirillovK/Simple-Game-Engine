@@ -871,8 +871,10 @@ void OpenGLRenderAdapter::renderInspector()
         {
             ImGui::Checkbox("Use Gravity", &rb->useGravity);
             ImGui::Checkbox("Is Kinematic", &rb->isKinematic);
+            {
+                rb->updateInvMass();
+            }
             ImGui::DragFloat("Mass", &rb->mass, 0.1f, 0.01f, 1000.0f);
-            if (ImGui::IsItemEdited()) rb->updateInvMass();
             ImGui::Text("Velocity: %.2f, %.2f, %.2f", rb->velocity.x, rb->velocity.y, rb->velocity.z);
         }
     }
