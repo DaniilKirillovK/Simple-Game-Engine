@@ -1534,7 +1534,8 @@ void OpenGLRenderAdapter::renderAssetBrowser()
 
     ImGui::Columns(columns, nullptr, false);
 
-    for (const auto& asset : m_currentDirectoryContent)
+
+    for (const auto asset : m_currentDirectoryContent)
     {
         ImGui::BeginGroup();
 
