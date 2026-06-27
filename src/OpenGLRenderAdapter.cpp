@@ -61,6 +61,8 @@ OpenGLRenderAdapter::OpenGLRenderAdapter()
     : m_window(nullptr)
       , m_width(DEFAULT_WIDTH)
       , m_height(DEFAULT_HEIGHT)
+      , m_shaderProgram(nullptr)
+      , m_world(nullptr)
 {
     g_instance = this;
 }
@@ -664,10 +666,7 @@ void OpenGLRenderAdapter::renderUIViewport()
 {
     float aspectRatio = 16.0f / 9.0f;
     ImGui::Begin("Viewport", nullptr, 
-        ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoScrollbar);
+        ImGuiWindowFlags_NoTitleBar);
 
     m_viewportSize = ImGui::GetContentRegionAvail();
     m_viewportHovered = ImGui::IsWindowHovered();
@@ -1032,7 +1031,6 @@ void OpenGLRenderAdapter::renderInspector()
             if (ImGui::MenuItem("Add Tag"))
             {
                 m_world->addComponent<Tag>(m_selectedEntity, Tag{});
-                LOG_INFO("Added Tag component to entity %d", m_selectedEntity);
             }
         }
 
@@ -1054,7 +1052,6 @@ void OpenGLRenderAdapter::renderInspector()
                 };
 
                 m_world->addComponent<MeshRenderer>(m_selectedEntity, MeshRenderer{ cubeMesh, defaultMaterial });
-                LOG_INFO("Added MeshRenderer component to entity %d", m_selectedEntity);
             }
         }
 
@@ -1064,7 +1061,6 @@ void OpenGLRenderAdapter::renderInspector()
             if (ImGui::MenuItem("Add Light"))
             {
                 m_world->addComponent<Light>(m_selectedEntity, Light{});
-                LOG_INFO("Added Light component to entity %d", m_selectedEntity);
             }
         }
 
@@ -1092,7 +1088,6 @@ void OpenGLRenderAdapter::renderInspector()
                 }
 
                 m_world->addComponent<Camera>(m_selectedEntity, cam);
-                LOG_INFO("Added Camera component to entity %d", m_selectedEntity);
             }
         }
 
@@ -1102,7 +1097,6 @@ void OpenGLRenderAdapter::renderInspector()
             if (ImGui::MenuItem("Add Rigidbody"))
             {
                 m_world->addComponent<Rigidbody>(m_selectedEntity, Rigidbody{});
-                LOG_INFO("Added Rigidbody component to entity %d", m_selectedEntity);
             }
         }
 
@@ -1112,7 +1106,6 @@ void OpenGLRenderAdapter::renderInspector()
             if (ImGui::MenuItem("Add Collider"))
             {
                 m_world->addComponent<Collider>(m_selectedEntity, Collider{});
-                LOG_INFO("Added Collider component to entity %d", m_selectedEntity);
             }
         }
     }
@@ -1677,7 +1670,6 @@ void OpenGLRenderAdapter::renderAssetBrowser()
                         {
                             renderer->material->diffuseTexture = m_selectedTexture;
                             renderer->material->hasTexture = true;
-                            LOG_INFO("Texture applied to entity %d", m_selectedEntity);
                         }
                     }
                 }

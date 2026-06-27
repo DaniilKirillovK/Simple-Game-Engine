@@ -1,5 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.10)
-project ("GameEngine")
+﻿project ("GameEngine")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -57,11 +56,6 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-#add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
-#    COMMAND ${CMAKE_COMMAND} -E remove_directory
-#        $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
-#)
-
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/Shaders
@@ -94,3 +88,5 @@ add_compile_definitions(
     IMGUI_DISABLE_OBSOLETE_KEYIO=0
     IMGUI_HAS_VIEWPORT=1
 )
+
+configure_file(${CMAKE_SOURCE_DIR}/imgui.ini ${CMAKE_BINARY_DIR}/imgui.ini COPYONLY)
