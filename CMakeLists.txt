@@ -1,4 +1,5 @@
-﻿project ("GameEngine")
+﻿cmake_minimum_required(VERSION 3.10)
+project ("GameEngine")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -68,20 +69,11 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
 )
 
-# Copy Assimp DLL to output directory after build
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${ASSIMP_DIR}/lib/${ASSIMP_LIB_NAME}.dll"
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/${ASSIMP_LIB_NAME}.dll
     COMMENT "Copying Assimp DLL to output directory"
-)
-
-# Copy Assimp PDB (debug symbols) if it exists
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${ASSIMP_DIR}/lib/${ASSIMP_LIB_NAME}.pdb"
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>/${ASSIMP_LIB_NAME}.pdb
-    COMMENT "Copying Assimp PDB to output directory (if exists)"
 )
 
 add_compile_definitions(
