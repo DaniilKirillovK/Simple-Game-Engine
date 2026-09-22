@@ -3,8 +3,12 @@
 #include "Components/Transform.h"
 #include "World.h"
 
+#include "tracy/Tracy.hpp"
+
 void MovementSystem::update(World& world, float deltaTime)
 {
+    ZoneScopedN("MovementSystem::update");
+
     if (!m_isEnabled) return;
 
     {

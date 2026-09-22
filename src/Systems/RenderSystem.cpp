@@ -9,6 +9,8 @@
 #include "Components/Light.h"
 #include <glm/gtc/type_ptr.hpp> 
 
+#include "tracy/Tracy.hpp"
+
 RenderSystem::RenderSystem(IRenderAdapter* renderAdapter)
     : renderAdapter(renderAdapter)
 {
@@ -16,6 +18,8 @@ RenderSystem::RenderSystem(IRenderAdapter* renderAdapter)
 
 void RenderSystem::update(World& world, float deltaTime)
 {
+    ZoneScopedN("RenderSystem::update");
+
     if (!m_isEnabled) return;
 
     if (!renderAdapter) return;

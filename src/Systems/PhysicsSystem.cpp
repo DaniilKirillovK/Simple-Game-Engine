@@ -9,6 +9,8 @@
 #include "InputHandler.h"
 #include <cmath>
 
+#include "tracy/Tracy.hpp"
+
 PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
     : m_renderer(renderer) 
 {
@@ -23,6 +25,8 @@ PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
 
 void PhysicsSystem::update(World& world, float deltaTime)
 {
+    ZoneScopedN("PhysicsSystem::update");
+
     if (m_debugRendering && m_renderer)
     {
         renderDebugColliders(world);

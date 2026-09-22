@@ -3,8 +3,12 @@
 #include "Components/Hierarchy.h"
 #include <queue>
 
+#include "tracy/Tracy.hpp"
+
 void TransformSystem::update(World& world, float deltaTime)
 {
+    ZoneScopedN("TransformSystem::update");
+
     if (!m_isEnabled) return;
 
     updateWorldMatrices(world);

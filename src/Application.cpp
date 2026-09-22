@@ -7,6 +7,7 @@
 #include "Resources/MeshLoader/MeshLoader.h"
 #include "Resources/TextureLoader/TextureLoader.h"
 #include "Resources/ShaderLoader/ShaderLoader.h"
+#include "tracy/Tracy.hpp"
 
 Application::Application()
 {
@@ -55,6 +56,8 @@ void Application::run()
         handleEvents();
         update(deltaTime);
         render();
+
+        FrameMark;
     }
     LOG_INFO("Main loop finished");
 }
@@ -78,6 +81,8 @@ void Application::bindActions()
 
 void Application::handleEvents()
 {
+    ZoneScoped;
+
     InputHandler::getInstance().update();
     renderer->pollEvents();
 
@@ -109,6 +114,8 @@ void Application::update(float deltaTime)
 
 void Application::render()
 {
+    ZoneScoped;
+
     currentState->render();
 }
 

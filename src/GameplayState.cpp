@@ -14,6 +14,8 @@
 #include "MeshFactory.h"
 #include "Components/MeshRenderer.h"
 
+#include "tracy/Tracy.hpp"
+
 GameplayState::GameplayState(IRenderAdapter& renderer)
 : m_renderer(renderer)
 {
@@ -24,11 +26,11 @@ void GameplayState::onEnter()
 {
     m_world = new World();
 
-    m_world->addSystem(std::make_unique<TransformSystem>());
     m_world->addSystem(std::make_unique<PhysicsSystem>(&m_renderer));
-    m_world->addSystem(std::make_unique<RenderSystem>(&m_renderer));
     m_world->addSystem(std::make_unique<CameraSystem>());
     m_world->addSystem(std::make_unique<MovementSystem>());
+    m_world->addSystem(std::make_unique<TransformSystem>());
+    m_world->addSystem(std::make_unique<RenderSystem>(&m_renderer));
 
 	setupTestScene();
 
@@ -37,6 +39,8 @@ void GameplayState::onEnter()
 
 void GameplayState::update(float deltaTime)
 {
+    ZoneScoped;
+
     m_world->update(deltaTime);
 }
 

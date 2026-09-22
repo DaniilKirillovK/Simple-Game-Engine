@@ -5,8 +5,12 @@
 #include "World.h"
 #include "Logger.h"
 
+#include "tracy/Tracy.hpp"
+
 void CameraSystem::update(World& world, float deltaTime)
 {
+    ZoneScopedN("CameraSystem::update");
+
     auto cameras = world.getEntitiesWithComponent<Camera>();
     EntityId activeCamera = INVALID_ENTITY;
 
