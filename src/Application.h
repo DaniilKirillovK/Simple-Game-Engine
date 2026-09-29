@@ -7,16 +7,19 @@
 #include "IGameState.h"
 #include "InputHandler.h"
 #include "IRenderAdapter.h"
+#include "JobSystem/JobSystem.h"
 #include "World.h"
 
 class Application
 {
 public:
-    Application();
+    Application() : m_jobs(0) {}
     ~Application();
     bool initialize(int width, int height, const std::string& title);
     void run();
     void shutdown();
+
+    JobSystem* jobs() { return m_jobs; }
 
 private:
     void bindActions();
@@ -25,6 +28,7 @@ private:
     void render();
     void changeState(std::unique_ptr<IGameState> newState);
 
+    JobSystem* m_jobs;
     std::unique_ptr<IRenderAdapter> renderer;
     std::unique_ptr<IGameState> currentState;
     bool running = false;

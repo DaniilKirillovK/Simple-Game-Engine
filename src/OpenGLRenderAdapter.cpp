@@ -784,18 +784,13 @@ void OpenGLRenderAdapter::renderSceneHierarchy()
 
     std::vector<EntityId> rootEntities;
 
-    for (auto& [entity, transform] : transforms.getAll())
+    const auto& transEnts = transforms.entities();
+    for (size_t i = 0; i < transEnts.size(); ++i)
     {
-        bool hasParent = false;
-        if (hierarchies.hasComponent(entity))
-        {
-            Hierarchy* hierarchy = hierarchies.getComponent(entity);
-            if (hierarchy->parent != -1 && transforms.hasComponent(hierarchy->parent))
-            {
-                hasParent = true;
-            }
-        }
-        if (!hasParent)
+        const EntityId entity = transEnts[i];
+
+        Hierarchy* hierarchy = hierarchies.getComponent(entity);
+        if (!hierarchy || hierarchy->parent == static_cast<EntityId>(-1))
         {
             rootEntities.push_back(entity);
         }
@@ -851,7 +846,7 @@ void OpenGLRenderAdapter::renderInspector()
         {
             if (ImGui::MenuItem("Add Tag"))
             {
-                m_world->addComponent<Tag>(m_selectedEntity, Tag{});
+                m_world->getComponentPool<Tag>().addComponent(m_selectedEntity, Tag{});
             }
         }
     }
@@ -970,7 +965,7 @@ void OpenGLRenderAdapter::renderInspector()
 
             if (light->type != LightType::Directional)
             {
-                if (m_world->hasComponent<Transform>(m_selectedEntity))
+                if (m_world->getComponentPool<Transform>().hasComponent(m_selectedEntity))
                 {
                     Transform* transform = m_world->getComponent<Transform>(m_selectedEntity);
                     if (transform)
@@ -993,13 +988,14 @@ void OpenGLRenderAdapter::renderInspector()
             {
                 if (camera->isActive)
                 {
-                    auto cameras = m_world->getEntitiesWithComponent<Camera>();
-                    for (auto& [entity, cam] : cameras)
+                    auto& camPool = m_world->getComponentPool<Camera>();
+                    auto& cams = camPool.components();
+                    auto& camEnts = camPool.entities();
+
+                    for (size_t i = 0; i < cams.size(); ++i)
                     {
-                        if (entity != m_selectedEntity)
-                        {
-                            cam->isActive = false;
-                        }
+                        if (camEnts[i] != m_selectedEntity)
+                            cams[i].isActive = false;
                     }
                 }
             }
@@ -1026,16 +1022,16 @@ void OpenGLRenderAdapter::renderInspector()
     if (ImGui::CollapsingHeader("+ Add Component", ImGuiTreeNodeFlags_DefaultOpen))
     {
         // Tag
-        if (!m_world->hasComponent<Tag>(m_selectedEntity))
+        if (!m_world->getComponentPool<Tag>().hasComponent(m_selectedEntity))
         {
             if (ImGui::MenuItem("Add Tag"))
             {
-                m_world->addComponent<Tag>(m_selectedEntity, Tag{});
+                m_world->getComponentPool<Tag>().addComponent(m_selectedEntity, Tag{});
             }
         }
 
         // MeshRenderer
-        if (!m_world->hasComponent<MeshRenderer>(m_selectedEntity))
+        if (!m_world->getComponentPool<MeshRenderer>().hasComponent(m_selectedEntity))
         {
             if (ImGui::MenuItem("Add Mesh Renderer"))
             {
@@ -1051,21 +1047,21 @@ void OpenGLRenderAdapter::renderInspector()
                     *this
                 };
 
-                m_world->addComponent<MeshRenderer>(m_selectedEntity, MeshRenderer{ cubeMesh, defaultMaterial });
+                m_world->getComponentPool<MeshRenderer>().addComponent(m_selectedEntity, MeshRenderer{ cubeMesh, defaultMaterial });
             }
         }
 
         // Light
-        if (!m_world->hasComponent<Light>(m_selectedEntity))
+        if (!m_world->getComponentPool<Light>().hasComponent(m_selectedEntity))
         {
             if (ImGui::MenuItem("Add Light"))
             {
-                m_world->addComponent<Light>(m_selectedEntity, Light{});
+                m_world->getComponentPool<Light>().addComponent(m_selectedEntity, Light{});
             }
         }
 
         // Camera
-        if (!m_world->hasComponent<Camera>(m_selectedEntity))
+        if (!m_world->getComponentPool<Camera>().hasComponent(m_selectedEntity))
         {
             if (ImGui::MenuItem("Add Camera"))
             {
@@ -1074,38 +1070,28 @@ void OpenGLRenderAdapter::renderInspector()
                 cam.fov = 45.0f;
                 cam.nearPlane = 0.1f;
                 cam.farPlane = 100.0f;
-                cam.isActive = true;
 
-                // Если это первая камера, делаем её активной
-                auto cameras = m_world->getEntitiesWithComponent<Camera>();
-                if (cameras.empty())
-                {
-                    cam.isActive = true;
-                }
-                else
-                {
-                    cam.isActive = false;
-                }
+                cam.isActive = m_world->getComponentPool<Camera>().size() == 0;
 
-                m_world->addComponent<Camera>(m_selectedEntity, cam);
+                m_world->getComponentPool<Camera>().addComponent(m_selectedEntity, cam);
             }
         }
 
         // Rigidbody
-        if (!m_world->hasComponent<Rigidbody>(m_selectedEntity))
+        if (!m_world->getComponentPool<Rigidbody>().hasComponent(m_selectedEntity))
         {
             if (ImGui::MenuItem("Add Rigidbody"))
             {
-                m_world->addComponent<Rigidbody>(m_selectedEntity, Rigidbody{});
+                m_world->getComponentPool<Rigidbody>().addComponent(m_selectedEntity, Rigidbody{});
             }
         }
 
         // Collider
-        if (!m_world->hasComponent<Collider>(m_selectedEntity))
+        if (!m_world->getComponentPool<Collider>().hasComponent(m_selectedEntity))
         {
             if (ImGui::MenuItem("Add Collider"))
             {
-                m_world->addComponent<Collider>(m_selectedEntity, Collider{});
+                m_world->getComponentPool<Collider>().addComponent(m_selectedEntity, Collider{});
             }
         }
     }
@@ -1143,7 +1129,7 @@ void OpenGLRenderAdapter::renderStatistics()
         int totalEntities = 0;
 
         auto& transforms = m_world->getComponentPool<Transform>();
-        totalEntities = transforms.getAll().size();
+        totalEntities = static_cast<int>(transforms.size());
 
         ImGui::Text("Total Entities: %d", totalEntities);
     }
@@ -1737,7 +1723,7 @@ void OpenGLRenderAdapter::addLogEntry(LogLevel level, const std::string& message
 void OpenGLRenderAdapter::renderHierarchyNode(ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth)
 {
     std::string entityName = "Entity " + std::to_string(entity);
-    if (m_world->hasComponent<Tag>(entity))
+    if (m_world->getComponentPool<Tag>().hasComponent(entity))
     {
         Tag* tag = m_world->getComponent<Tag>(entity);
         if (tag && !tag->name.empty())

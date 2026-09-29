@@ -6,7 +6,7 @@
 class Hierarchy : public Component 
 {
 public:
-    EntityId parent = -1;
+    EntityId parent = INVALID_ENTITY;
     std::vector<EntityId> children;
 
     Hierarchy() = default;

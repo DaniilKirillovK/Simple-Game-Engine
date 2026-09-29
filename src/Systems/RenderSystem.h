@@ -7,15 +7,12 @@ class RenderSystem : public ISystem
 {
 public:
 	RenderSystem(IRenderAdapter* renderAdapter);
-
-	virtual void update(World& world, float deltaTime) override;
-	void setProjectionMatrix(const glm::mat4& matrix) { projectionMatrix = matrix; }
-	void setViewMatrix(const glm::mat4& matrix) { viewMatrix = matrix; }
+	virtual void update(World& world, JobSystem* jobs, float deltaTime) override;
 	virtual void setEnabled(bool isEnabled) override;
 
 private:
 	bool m_isEnabled = true;
-	IRenderAdapter* renderAdapter;
-	glm::mat4 projectionMatrix;
-	glm::mat4 viewMatrix;
+	IRenderAdapter* m_renderAdapter = nullptr;
+
+	std::vector<Light*> m_lights;
 };

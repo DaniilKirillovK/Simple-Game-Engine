@@ -7,27 +7,20 @@
 #include <unordered_set>
 #include <memory>
 #include <typeindex>
+#include "JobSystem/JobSystem.h"
 
 class World
 {
 public:
-	World() : nextEntityId(1) {}
+	World() : nextEntityId(1), m_currentDeltaTime(0.0f) {}
 
 	EntityId createEntity();
 	void destroyEntity(EntityId entity);
 	bool isValidEntity(EntityId entity) const;
 
 	template<typename T>
-	void addComponent(EntityId entity, const T& component);
-	template<typename T>
-	void removeComponent(EntityId entity);
-	template<typename T>
 	T* getComponent(EntityId entity);
-	template<typename T>
-	bool hasComponent(EntityId entity) const;
 
-	template<typename T>
-	std::vector<std::pair<EntityId, T*>> getEntitiesWithComponent();
 	template<typename T>
 	ComponentPool<T>& getComponentPool();
 
@@ -37,7 +30,7 @@ public:
 	float getCurrentDeltaTime() { return m_currentDeltaTime; }
 
 	void addSystem(std::unique_ptr<ISystem> system);
-	void update(float deltaTime);
+	void update(JobSystem* jobs, float deltaTime);
 
 	void clear();
 
@@ -71,51 +64,10 @@ inline bool World::isValidEntity(EntityId entity) const
 }
 
 template<typename T>
-inline void World::addComponent(EntityId entity, const T& component)
-{
-	static_assert(std::is_base_of_v<Component, T> || true, "T must be a Component");
-
-	ComponentPool<T>& pool = getComponentPool<T>();
-	pool.addComponent(entity, component);
-}
-
-template<typename T>
-inline void World::removeComponent(EntityId entity)
-{
-	auto it = componentPools.find(std::type_index(typeid(T)));
-	if (it != componentPools.end())
-	{
-		it->second->removeComponent(entity);
-	}
-}
-
-template<typename T>
 inline T* World::getComponent(EntityId entity)
 {
 	ComponentPool<T>& pool = getComponentPool<T>();
 	return pool.getComponent(entity);
-}
-
-template<typename T>
-inline bool World::hasComponent(EntityId entity) const
-{
-	auto it = componentPools.find(std::type_index(typeid(T)));
-	if (it == componentPools.end()) return false;
-	return it->second->hasComponent(entity);
-}
-
-template<typename T>
-inline std::vector<std::pair<EntityId, T*>> World::getEntitiesWithComponent()
-{
-	std::vector<std::pair<EntityId, T*>> result;
-	auto& pool = getComponentPool<T>();
-
-	for (auto& [entity, component] : pool.getAll()) 
-	{
-		result.emplace_back(entity, &component);
-	}
-
-	return result;
 }
 
 template<typename T>
@@ -152,12 +104,12 @@ inline void World::addSystem(std::unique_ptr<ISystem> system)
 	systems.push_back(std::move(system));
 }
 
-inline void World::update(float deltaTime)
+inline void World::update(JobSystem* jobs, float deltaTime)
 {
 	m_currentDeltaTime = deltaTime;
 	for (std::unique_ptr<ISystem>& system : systems)
 	{
-		system->update(*this, deltaTime);
+		system->update(*this, jobs, deltaTime);
 	}
 }
 
@@ -166,4 +118,5 @@ inline void World::clear()
 	componentPools.clear();
 	entities.clear();
 	nextEntityId = 1;
+	m_currentDeltaTime = 0.0f;
 }

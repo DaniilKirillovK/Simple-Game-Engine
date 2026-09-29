@@ -14,6 +14,8 @@
 #include "MeshFactory.h"
 #include "Components/MeshRenderer.h"
 
+#include "JobSystem/JobSystem.h"
+
 #include "tracy/Tracy.hpp"
 
 GameplayState::GameplayState(IRenderAdapter& renderer)
@@ -37,11 +39,11 @@ void GameplayState::onEnter()
 	LOG_INFO("Enter Gameplay State");
 }
 
-void GameplayState::update(float deltaTime)
+void GameplayState::update(JobSystem* jobs, float deltaTime)
 {
     ZoneScoped;
 
-    m_world->update(deltaTime);
+    m_world->update(jobs, deltaTime);
 }
 
 void GameplayState::render()
@@ -138,84 +140,66 @@ void GameplayState::restoreSceneState()
 void GameplayState::createEmptyEntity()
 {
     EntityId newEntity = m_world->createEntity();
-    m_world->addComponent<Transform>(newEntity, Transform{});
-    m_world->addComponent<Tag>(newEntity, Tag{ "Empty" });
+    m_world->getComponentPool<Transform>().addComponent(newEntity, Transform{});
+    m_world->getComponentPool<Tag>().addComponent(newEntity, Tag{ "Empty" });
     m_renderer.setSelectedEntity(newEntity);
     LOG_INFO("Created empty entity: %d", newEntity);
 }
 
 void GameplayState::createCubeEntity()
 {
-    auto vertShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
-    auto fragShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
-
-    Mesh* cubeMesh = MeshFactory::createCube();
-
-    Material* defaultMaterial = new Material{
-        glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
-        vertShader->get(),
-        fragShader->get(),
-        m_renderer
-    };
-
-    EntityId newEntity = m_world->createEntity();
-    m_world->addComponent<Transform>(newEntity, Transform{});
-    m_world->addComponent<MeshRenderer>(newEntity, MeshRenderer{ cubeMesh, defaultMaterial });
-    m_world->addComponent<Tag>(newEntity, Tag{ "Cube" });
-    m_world->addComponent<Rigidbody>(newEntity, Rigidbody{ 1.0f, true, false });
-    m_world->addComponent<Collider>(newEntity, Collider{ glm::vec3(0.5f) });
-
-    m_renderer.setSelectedEntity(newEntity);
-    LOG_INFO("Created cube: %d", newEntity);
+    createMeshEntity(MeshFactory::createCube(), "Cube",
+        glm::vec4(0.8f, 0.8f, 0.8f, 1.0f), true);
 }
 
 void GameplayState::createSphereEntity()
 {
-    auto vertShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
-    auto fragShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
-
-    Mesh* sphereMesh = MeshFactory::createSphere(0.5f, 36, 18);
-
-    Material* defaultMaterial = new Material{
-        glm::vec4(0.8f, 0.6f, 0.2f, 1.0f),
-        vertShader->get(),
-        fragShader->get(),
-        m_renderer
-    };
-
-    EntityId newEntity = m_world->createEntity();
-    m_world->addComponent<Transform>(newEntity, Transform{});
-    m_world->addComponent<MeshRenderer>(newEntity, MeshRenderer{ sphereMesh, defaultMaterial });
-    m_world->addComponent<Tag>(newEntity, Tag{ "Sphere" });
-    m_world->addComponent<Rigidbody>(newEntity, Rigidbody{ 1.0f, true, false });
-    m_world->addComponent<Collider>(newEntity, Collider{ 0.5f });
-
-    m_renderer.setSelectedEntity(newEntity);
-    LOG_INFO("Created sphere: %d", newEntity);
+    createMeshEntity(MeshFactory::createSphere(0.5f, 36, 18), "Sphere",
+        glm::vec4(0.8f, 0.6f, 0.2f, 1.0f), true);
 }
 
 void GameplayState::createFromAsset(Mesh* mesh, const std::string& path)
+{
+    if (!mesh) return;
+    std::string name = std::filesystem::path(path).stem().string();
+    createMeshEntity(mesh, name, glm::vec4(0.8f, 0.8f, 0.8f, 1.0f), false);
+}
+
+void GameplayState::createMeshEntity(Mesh* mesh, const std::string& tagName, const glm::vec4& color, bool withPhysics)
 {
     if (!mesh) return;
 
     auto vertShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
     auto fragShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
 
+    if (!vertShader || !fragShader) return;
+
     Material* material = new Material{
-        glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+        color,
         vertShader->get(),
         fragShader->get(),
         m_renderer
     };
 
-    EntityId newEntity = m_world->createEntity();
-    m_world->addComponent<Transform>(newEntity, Transform{});
-    m_world->addComponent<MeshRenderer>(newEntity, MeshRenderer{ mesh, material });
+    const EntityId e = m_world->createEntity();
 
-    std::string name = std::filesystem::path(path).stem().string();
-    m_world->addComponent<Tag>(newEntity, Tag{ name });
+    auto& tPool = m_world->getComponentPool<Transform>();
+    auto& mrPool = m_world->getComponentPool<MeshRenderer>();
+    auto& tagPool = m_world->getComponentPool<Tag>();
+    auto& rbPool = m_world->getComponentPool<Rigidbody>();
+    auto& cPool = m_world->getComponentPool<Collider>();
 
-    m_renderer.setSelectedEntity(newEntity);
-    LOG_INFO("Created object from model: %s", name.c_str());
+    tPool.addComponent(e, Transform{});
+    mrPool.addComponent(e, MeshRenderer{ mesh, material });
+    tagPool.addComponent(e, Tag{ tagName });
+
+    if (withPhysics)
+    {
+        rbPool.addComponent(e, Rigidbody{ 1.0f, true, false });
+        cPool.addComponent(e, Collider{ 0.5f });
+    }
+
+    m_renderer.setSelectedEntity(e);
+    LOG_INFO("Created entity: " + std::to_string(e) + " (" + tagName + ")");
 }
 

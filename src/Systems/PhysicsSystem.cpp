@@ -11,6 +11,44 @@
 
 #include "tracy/Tracy.hpp"
 
+namespace 
+{
+    struct GravityCtx
+    {
+        PhysicsSystem::PhysicsEntity* entities;
+        glm::vec3 gravity;
+        float     dt;
+    };
+
+    void applyGravityJob(void* raw, uint32_t i)
+    {
+        auto* ctx = static_cast<GravityCtx*>(raw);
+        auto& rb = *ctx->entities[i].rigidbody;
+
+        if (rb.useGravity && !rb.isKinematic)
+            rb.velocity += ctx->gravity * ctx->dt;
+    }
+
+    struct IntegrateCtx
+    {
+        PhysicsSystem::PhysicsEntity* entities;
+        float dt;
+    };
+
+    void integratePositionsJob(void* raw, uint32_t i)
+    {
+        auto* ctx = static_cast<IntegrateCtx*>(raw);
+        auto& e = ctx->entities[i];
+        Rigidbody& rb = *e.rigidbody;
+
+        if (rb.isKinematic) return;
+
+        rb.velocity += rb.acceleration * ctx->dt;
+        e.transform->position += rb.velocity * ctx->dt;
+        rb.acceleration = glm::vec3(0.0f);
+    }
+}
+
 PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
     : m_renderer(renderer) 
 {
@@ -23,7 +61,7 @@ PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
     });
 }
 
-void PhysicsSystem::update(World& world, float deltaTime)
+void PhysicsSystem::update(World& world, JobSystem* jobs, float deltaTime)
 {
     ZoneScopedN("PhysicsSystem::update");
 
@@ -34,27 +72,31 @@ void PhysicsSystem::update(World& world, float deltaTime)
 
     if (!m_isEnabled) return;
 
-    std::vector<EntityId> entities;
-
-    auto rigidbodyEntities = world.getEntitiesWithComponent<Rigidbody>();
-
-    for (auto& [entity, rb] : rigidbodyEntities)
-    {
-        if (world.hasComponent<Transform>(entity) && world.hasComponent<Collider>(entity))
-        {
-            entities.push_back(entity);
-        }
-    }
-
-    if (entities.empty()) return;
+    gatherEntities(world);
+    if (m_entities.empty()) return;
 
     m_accumulator += deltaTime;
 
-    while (m_accumulator >= m_fixedTimestep) 
+    const float maxAccum = m_fixedTimestep * static_cast<float>(m_maxSubsteps);
+    if (m_accumulator > maxAccum)
+        m_accumulator = maxAccum;
+
+    while (m_accumulator >= m_fixedTimestep)
     {
-        applyGravity(world, entities, m_fixedTimestep);
-        updatePositions(world, entities, m_fixedTimestep);
-        detectAndResolveCollisions(world, entities);
+        ZoneScopedN("Physics::Substep");
+
+        if (jobs)
+        {
+            applyGravityParallel(jobs, m_fixedTimestep);
+            updatePositionsParallel(jobs, m_fixedTimestep);
+        }
+        else
+        {
+            applyGravity(m_fixedTimestep);
+            updatePositions(m_fixedTimestep);
+        }
+
+        detectAndResolveCollisions();
 
         m_accumulator -= m_fixedTimestep;
     }
@@ -65,68 +107,123 @@ void PhysicsSystem::setEnabled(bool isEnabled)
     m_isEnabled = isEnabled;
 }
 
-void PhysicsSystem::applyGravity(World& world, std::vector<EntityId>& entities, float dt)
+void PhysicsSystem::gatherEntities(World& world)
 {
-    for (EntityId entity : entities) 
-    {
-        Rigidbody* rb = world.getComponent<Rigidbody>(entity);
+    ZoneScopedN("Physics::GatherEntities");
 
-        if (rb && rb->useGravity && !rb->isKinematic) 
+    auto& rbPool = world.getComponentPool<Rigidbody>();
+    auto& tPool = world.getComponentPool<Transform>();
+    auto& cPool = world.getComponentPool<Collider>();
+
+    auto& rbs = rbPool.components();
+    auto& rbEnts = rbPool.entities();
+
+    m_entities.clear();
+    m_entities.reserve(rbs.size());
+
+    for (size_t i = 0; i < rbs.size(); ++i)
+    {
+        const EntityId e = rbEnts[i];
+
+        Transform* tr = tPool.getComponent(e);
+        Collider* col = cPool.getComponent(e);
+
+        if (tr && col)
         {
-            rb->velocity += m_gravity * dt;
+            m_entities.push_back({ e, tr, &rbs[i], col });
         }
     }
 }
 
-void PhysicsSystem::updatePositions(World& world, std::vector<EntityId>& entities, float dt)
+void PhysicsSystem::applyGravity(float dt)
 {
-    for (EntityId entity : entities) 
-    {
-        Transform* transform = world.getComponent<Transform>(entity);
-        Rigidbody* rb = world.getComponent<Rigidbody>(entity);
+    ZoneScopedN("Physics::ApplyGravity");
 
-        if (transform && rb && !rb->isKinematic) 
+    for (auto& e : m_entities)
+    {
+        Rigidbody& rb = *e.rigidbody;
+        if (rb.useGravity && !rb.isKinematic)
         {
-            rb->velocity += rb->acceleration * dt;
-            transform->position += rb->velocity * dt;
-            rb->acceleration = glm::vec3(0.0f);
+            rb.velocity += m_gravity * dt;
         }
     }
 }
 
-void PhysicsSystem::detectAndResolveCollisions(World& world, std::vector<EntityId>& entities)
+void PhysicsSystem::updatePositions(float dt)
 {
-    for (size_t i = 0; i < entities.size(); ++i) 
+    ZoneScopedN("Physics::UpdatePositions");
+
+    for (auto& e : m_entities)
     {
-        for (size_t j = i + 1; j < entities.size(); ++j) 
+        Rigidbody& rb = *e.rigidbody;
+        if (rb.isKinematic) continue;
+
+        rb.velocity += rb.acceleration * dt;
+        e.transform->position += rb.velocity * dt;
+        rb.acceleration = glm::vec3(0.0f);
+    }
+}
+
+void PhysicsSystem::detectAndResolveCollisions()
+{
+    ZoneScopedN("Physics::DetectAndResolve");
+
+    const size_t n = m_entities.size();
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        auto& A = m_entities[i];
+
+        for (size_t j = i + 1; j < n; ++j)
         {
-            EntityId entityA = entities[i];
-            EntityId entityB = entities[j];
-
-            Collider* colliderA = world.getComponent<Collider>(entityA);
-            Collider* colliderB = world.getComponent<Collider>(entityB);
-            Transform* transformA = world.getComponent<Transform>(entityA);
-            Transform* transformB = world.getComponent<Transform>(entityB);
-
-            if (!colliderA || !colliderB || !transformA || !transformB) continue;
+            auto& B = m_entities[j];
 
             CollisionInfo info;
 
-            if (checkCollision(*colliderA, *transformA, *colliderB, *transformB, info)) 
-            {
-                info.entityA = entityA;
-                info.entityB = entityB;
+            if (!checkCollision(*A.collider, *A.transform,
+                *B.collider, *B.transform,
+                info)) continue;
 
-                if (!colliderA->isTrigger && !colliderB->isTrigger) 
-                {
-                    Rigidbody* rbA = world.getComponent<Rigidbody>(entityA);
-                    Rigidbody* rbB = world.getComponent<Rigidbody>(entityB);
+            info.entityA = A.id;
+            info.entityB = B.id;
 
-                    resolveCollision(info, *rbA, *rbB, *transformA, *transformB);
-                }
-            }
+            if (A.collider->isTrigger || B.collider->isTrigger)
+                continue;
+
+            resolveCollision(info, *A.rigidbody, *B.rigidbody,
+                *A.transform, *B.transform);
         }
     }
+}
+
+void PhysicsSystem::applyGravityParallel(JobSystem* jobs, float dt)
+{
+    ZoneScopedN("Physics::Gravity (parallel)");
+
+    if (m_entities.empty()) return;
+
+    GravityCtx ctx{ m_entities.data(), m_gravity, dt };
+
+    const uint32_t count = static_cast<uint32_t>(m_entities.size());
+    const uint32_t batch = std::max(64u,
+        count / (jobs->getNumWorkers() * 4));
+
+    jobs->parallelFor(count, batch, applyGravityJob, &ctx);
+}
+
+void PhysicsSystem::updatePositionsParallel(JobSystem* jobs, float dt)
+{
+    ZoneScopedN("Physics::Integrate (parallel)");
+
+    if (m_entities.empty()) return;
+
+    IntegrateCtx ctx{ m_entities.data(), dt };
+
+    const uint32_t count = static_cast<uint32_t>(m_entities.size());
+    const uint32_t batch = std::max(64u,
+        count / (jobs->getNumWorkers() * 4));
+
+    jobs->parallelFor(count, batch, integratePositionsJob, &ctx);
 }
 
 void PhysicsSystem::renderDebugColliders(World& world)
@@ -135,31 +232,35 @@ void PhysicsSystem::renderDebugColliders(World& world)
 
     m_renderer->beginDebugDraw();
 
-    auto colliderEntities = world.getEntitiesWithComponent<Collider>();
+    auto& cPool = world.getComponentPool<Collider>();
+    auto& tPool = world.getComponentPool<Transform>();
 
-    for (auto& [entity, collider] : colliderEntities)
+    auto& cols = cPool.components();
+    auto& ents = cPool.entities();
+
+    for (size_t i = 0; i < cols.size(); ++i)
     {
-        if (world.hasComponent<Transform>(entity))
+        const EntityId e = ents[i];
+        const Transform* tr = tPool.getComponent(e);
+        if (!tr) continue;
+
+        const Collider& col = cols[i];
+        const glm::vec3 pos = tr->getWorldPosition();
+
+        const glm::vec3 worldMin = col.getWorldMin(pos);
+        const glm::vec3 worldMax = col.getWorldMax(pos);
+
+        const glm::vec4 color = col.isTrigger
+            ? glm::vec4(1.0f, 1.0f, 0.0f, 0.5f)
+            : glm::vec4(1.0f, 0.0f, 0.0f, 0.5f);
+
+        if (col.type == ColliderType::Box)
         {
-            const Transform* transform = world.getComponent<Transform>(entity);
-            if (transform) 
-            {
-                glm::vec3 worldMin = collider->getWorldMin(transform->getWorldPosition());
-                glm::vec3 worldMax = collider->getWorldMax(transform->getWorldPosition());
-
-                glm::vec4 color = collider->isTrigger
-                    ? glm::vec4(1.0f, 1.0f, 0.0f, 0.5f)
-                    : glm::vec4(1.0f, 0.0f, 0.0f, 0.5f);
-
-                if (collider->type == ColliderType::Box)
-                {
-                    m_renderer->drawDebugAABB(worldMin, worldMax, color);
-                }
-                else if (collider->type == ColliderType::Sphere)
-                {
-                    m_renderer->drawDebugSphere(transform->getWorldPosition(), collider->radius + 0.05f, color);
-                }
-            }
+            m_renderer->drawDebugAABB(worldMin, worldMax, color);
+        }
+        else if (col.type == ColliderType::Sphere)
+        {
+            m_renderer->drawDebugSphere(pos, col.radius + 0.05f, color);
         }
     }
 

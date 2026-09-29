@@ -5,51 +5,48 @@
 
 #include "tracy/Tracy.hpp"
 
-void MovementSystem::update(World& world, float deltaTime)
+void MovementSystem::update(World& world, JobSystem* jobs, float deltaTime)
 {
     ZoneScopedN("MovementSystem::update");
 
     if (!m_isEnabled) return;
 
+    m_time += deltaTime;
+
+    auto& tagPool = world.getComponentPool<Tag>();
+    auto& tPool = world.getComponentPool<Transform>();
+
+    auto& tags = tagPool.components();
+    auto& ents = tagPool.entities();
+
+    const float bounceOffset = sinf(m_time * 3.0f) * 1.5f;
+    const float orbitX = sinf(m_time * 2.0f) * 3.0f;
+    const float orbitZ = cosf(m_time * 2.0f) * 3.0f;
+
+    const float rotStepY = 45.0f * deltaTime;
+    const float rotStepX = 30.0f * deltaTime;
+
+    for (size_t i = 0; i < tags.size(); ++i)
     {
-        static float time = 0.0f;
-        time += deltaTime;
+        Transform* tr = tPool.getComponent(ents[i]);
+        if (!tr) continue;
 
-        auto tags = world.getEntitiesWithComponent<Tag>();
-        for (auto& [entity, tag] : tags) 
+        const std::string& name = tags[i].name;
+
+        if (name == "Rotating")
         {
-            if (tag->name == "Rotating") 
-            {
-                Transform* transform = world.getComponent<Transform>(entity);
-                if (transform) 
-                {
-                    transform->eulerRotation.y += 45.0f * deltaTime;
-                    transform->eulerRotation.x += 30.0f * deltaTime;
-                    transform->updateQuaternion();
-                }
-            }
-
-            if (tag->name == "Bouncing")
-            {
-                Transform* transform = world.getComponent<Transform>(entity);
-                if (transform) 
-                {
-                    float offset = sinf(time * 3.0f) * 1.5f;
-                    transform->position.y = 0.0f + offset;
-                }
-            }
-
-            if (tag->name == "Orbiting")
-            {
-                Transform* transform = world.getComponent<Transform>(entity);
-                if (transform) 
-                {
-                    float radius = 3.0f;
-                    float speed = 2.0f;
-                    transform->position.x = sinf(time * speed) * radius;
-                    transform->position.z = cosf(time * speed) * radius;
-                }
-            }
+            tr->eulerRotation.y += rotStepY;
+            tr->eulerRotation.x += rotStepX;
+            tr->updateQuaternion();
+        }
+        else if (name == "Bouncing")
+        {
+            tr->position.y = bounceOffset;
+        }
+        else if (name == "Orbiting")
+        {
+            tr->position.x = orbitX;
+            tr->position.z = orbitZ;
         }
     }
 }

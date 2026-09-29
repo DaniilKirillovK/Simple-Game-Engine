@@ -9,11 +9,6 @@
 #include "Resources/ShaderLoader/ShaderLoader.h"
 #include "tracy/Tracy.hpp"
 
-Application::Application()
-{
-    
-}
-
 Application::~Application()
 {
 }
@@ -101,7 +96,7 @@ void Application::update(float deltaTime)
 {
     if (currentState) 
     {
-        currentState->update(deltaTime);
+        currentState->update(m_jobs, deltaTime);
         if (currentState->isFinished()) 
         {
             auto next = currentState->getNextState();

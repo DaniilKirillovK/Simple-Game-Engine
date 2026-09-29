@@ -23,9 +23,17 @@ struct CollisionInfo
 class PhysicsSystem : public ISystem 
 {
 public:
+    struct PhysicsEntity
+    {
+        EntityId   id;
+        Transform* transform;
+        Rigidbody* rigidbody;
+        Collider* collider;
+    };
+
     PhysicsSystem(IRenderAdapter* renderAdapter);
 
-    virtual void update(World& world, float deltaTime) override;
+    virtual void update(World& world, JobSystem* jobs, float deltaTime) override;
     virtual void setEnabled(bool isEnabled) override;
 
     void setGravity(const glm::vec3& gravity) { m_gravity = gravity; }
@@ -36,18 +44,14 @@ public:
     void toggleDebugRendering() { m_debugRendering = !m_debugRendering; }
 
 private:
-    bool m_isEnabled = false;
-    IRenderAdapter* m_renderer;
+    void gatherEntities(World& world);
 
-    glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
-    bool m_debugRendering = true;
+    void applyGravity(float dt);
+    void updatePositions(float dt);
+    void detectAndResolveCollisions();
 
-    float m_fixedTimestep = 1.0f / 120.f;
-    float m_accumulator = 0.0f;
-
-    void applyGravity(World& world, std::vector<EntityId>& entities, float dt);
-    void updatePositions(World& world, std::vector<EntityId>& entities, float dt);
-    void detectAndResolveCollisions(World& world, std::vector<EntityId>& entities);
+    void applyGravityParallel(JobSystem* jobs, float dt);
+    void updatePositionsParallel(JobSystem* jobs, float dt);
 
     void renderDebugColliders(World& world);
 
@@ -58,5 +62,16 @@ private:
     void resolveCollision(CollisionInfo& info,
         Rigidbody& rbA, Rigidbody& rbB,
         Transform& transformA, Transform& transformB);
+
+    std::vector<PhysicsEntity> m_entities;
+
+    glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
+    float m_fixedTimestep = 1.0f / 60.f;
+    float m_accumulator = 0.0f;
+    int m_maxSubsteps = 5;
+
+    bool m_isEnabled = false;
+    bool m_debugRendering = true;
+    IRenderAdapter* m_renderer = nullptr;
 };
 

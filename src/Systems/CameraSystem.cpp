@@ -7,26 +7,28 @@
 
 #include "tracy/Tracy.hpp"
 
-void CameraSystem::update(World& world, float deltaTime)
+void CameraSystem::update(World& world, JobSystem* jobs, float deltaTime)
 {
     ZoneScopedN("CameraSystem::update");
 
-    auto cameras = world.getEntitiesWithComponent<Camera>();
-    EntityId activeCamera = INVALID_ENTITY;
+    auto& camPool = world.getComponentPool<Camera>();
+    auto& cameras = camPool.components();
+    auto& camEnts = camPool.entities();
 
-    for (auto& [entity, camera] : cameras) 
+    EntityId activeCamera = INVALID_ENTITY;
+    for (size_t i = 0; i < cameras.size(); ++i)
     {
-        if (camera->isActive) 
+        if (cameras[i].isActive)
         {
-            activeCamera = entity;
+            activeCamera = camEnts[i];
             break;
         }
     }
 
     if (activeCamera == INVALID_ENTITY) return;
 
-    Transform* transform = world.getComponent<Transform>(activeCamera);
-    Camera* camera = world.getComponent<Camera>(activeCamera);
+    auto* transform = world.getComponent<Transform>(activeCamera);
+    auto* camera = world.getComponent<Camera>(activeCamera);
     if (!transform || !camera) return;
 
     float moveSpeed = 10.0f;

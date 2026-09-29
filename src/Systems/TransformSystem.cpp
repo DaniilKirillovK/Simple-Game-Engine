@@ -5,7 +5,7 @@
 
 #include "tracy/Tracy.hpp"
 
-void TransformSystem::update(World& world, float deltaTime)
+void TransformSystem::update(World& world, JobSystem* jobs, float deltaTime)
 {
     ZoneScopedN("TransformSystem::update");
 
@@ -21,30 +21,27 @@ void TransformSystem::setEnabled(bool isEnabled)
 
 void TransformSystem::updateWorldMatrices(World& world)
 {
-    auto& transforms = world.getComponentPool<Transform>();
-    auto& hierarchies = world.getComponentPool<Hierarchy>();
+    auto& tPool = world.getComponentPool<Transform>();
+    auto& hPool = world.getComponentPool<Hierarchy>();
 
-    for (auto& [entity, transform] : transforms.getAll())
+    auto& transforms = tPool.components();
+    auto& transEnts = tPool.entities();
+
+    for (auto& t : transforms)
     {
-        transform.markDirty();
+        t.markDirty();
     }
 
     std::queue<EntityId> queue;
 
-    for (auto& [entity, transform] : transforms.getAll())
+    for (size_t i = 0; i < transEnts.size(); ++i)
     {
-        bool hasParent = false;
-        if (hierarchies.hasComponent(entity))
+        EntityId e = transEnts[i];
+        Hierarchy* h = hPool.getComponent(e);
+
+        if (!h || h->parent == INVALID_ENTITY)
         {
-            Hierarchy* hierarchy = hierarchies.getComponent(entity);
-            if (hierarchy->parent != -1 && transforms.hasComponent(hierarchy->parent))
-            {
-                hasParent = true;
-            }
-        }
-        if (!hasParent)
-        {
-            queue.push(entity);
+            queue.push(e);
         }
     }
 
@@ -53,29 +50,26 @@ void TransformSystem::updateWorldMatrices(World& world)
         EntityId current = queue.front();
         queue.pop();
 
-        Transform* transform = transforms.getComponent(current);
+        Transform* transform = tPool.getComponent(current);
         if (!transform) continue;
 
         glm::mat4 parentMatrix = glm::mat4(1.0f);
 
-        if (hierarchies.hasComponent(current))
+        Hierarchy* hierarchy = hPool.getComponent(current);
+
+        if (hierarchy && hierarchy->parent != INVALID_ENTITY)
         {
-            Hierarchy* hierarchy = hierarchies.getComponent(current);
-            if (hierarchy->parent != -1 && transforms.hasComponent(hierarchy->parent))
+            Transform* parentTransform = tPool.getComponent(hierarchy->parent);
+            if (parentTransform && !parentTransform->worldMatrixDirty)
             {
-                Transform* parentTransform = transforms.getComponent(hierarchy->parent);
-                if (parentTransform && !parentTransform->worldMatrixDirty)
-                {
-                    parentMatrix = parentTransform->worldMatrix;
-                }
+                parentMatrix = parentTransform->worldMatrix;
             }
         }
 
         transform->updateWorldMatrix(parentMatrix);
 
-        if (hierarchies.hasComponent(current))
+        if (hierarchy)
         {
-            Hierarchy* hierarchy = hierarchies.getComponent(current);
             for (EntityId child : hierarchy->children)
             {
                 queue.push(child);

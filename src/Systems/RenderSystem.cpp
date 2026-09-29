@@ -12,76 +12,82 @@
 #include "tracy/Tracy.hpp"
 
 RenderSystem::RenderSystem(IRenderAdapter* renderAdapter)
-    : renderAdapter(renderAdapter)
+    : m_renderAdapter(renderAdapter)
 {
 }
 
-void RenderSystem::update(World& world, float deltaTime)
+void RenderSystem::update(World& world, JobSystem* jobs, float deltaTime)
 {
     ZoneScopedN("RenderSystem::update");
 
-    if (!m_isEnabled) return;
+    if (!m_isEnabled || !m_renderAdapter) return;
 
-    if (!renderAdapter) return;
+    auto& camPool = world.getComponentPool<Camera>();
+    auto& cams = camPool.components();
+    auto& camEnts = camPool.entities();
 
     EntityId activeCamera = INVALID_ENTITY;
     Camera* cameraComponent = nullptr;
-    Transform* cameraTransform = nullptr;
 
-    auto cameras = world.getEntitiesWithComponent<Camera>();
-    for (auto& [entity, camera] : cameras) 
+    for (size_t i = 0; i < cams.size(); ++i)
     {
-        if (camera->isActive)
+        if (cams[i].isActive)
         {
-            activeCamera = entity;
-            cameraComponent = camera;
-            cameraTransform = world.getComponent<Transform>(entity);
+            activeCamera = camEnts[i];
+            cameraComponent = &cams[i];
             break;
         }
     }
 
-    if (!cameraComponent || !cameraTransform) 
+    if (!cameraComponent) return;
+
+    auto& tPool = world.getComponentPool<Transform>();
+    Transform* cameraTransform = tPool.getComponent(activeCamera);
+    if (!cameraTransform) return;
+
+    const glm::mat4 viewMatrix = cameraComponent->getViewMatrix(*cameraTransform);
+    cameraComponent->aspectRatio = m_renderAdapter->getAspectRatio();
+    const glm::mat4 projectionMatrix = cameraComponent->getProjectionMatrix();
+
+    const float* viewPtr = glm::value_ptr(viewMatrix);
+    const float* projPtr = glm::value_ptr(projectionMatrix);
+
+    m_lights.clear();
+
+    auto& lightPool = world.getComponentPool<Light>();
+    auto& lightComps = lightPool.components();
+
+    for (auto& light : lightComps)
     {
-        return;
+        if (light.enabled)
+            m_lights.push_back(&light);
     }
 
-    glm::mat4 viewMatrix = cameraComponent->getViewMatrix(*cameraTransform);
-    cameraComponent->aspectRatio = renderAdapter->getAspectRatio();
-    glm::mat4 projectionMatrix = cameraComponent->getProjectionMatrix();
+    auto& mrPool = world.getComponentPool<MeshRenderer>();
+    auto& renderers = mrPool.components();
+    auto& rendererEnts = mrPool.entities();
 
-    std::vector<Light*> lights;
-    auto lightEntities = world.getEntitiesWithComponent<Light>();
-    for (auto& [entity, light] : lightEntities) 
+    for (size_t i = 0; i < renderers.size(); ++i)
     {
-        if (light->enabled) 
-        {
-            lights.push_back(light);
-        }
-    }
+        auto& r = renderers[i];
+        if (!r.visible || !r.mesh || !r.material) continue;
 
-    auto renderers = world.getEntitiesWithComponent<MeshRenderer>();
+        Transform* tr = tPool.getComponent(rendererEnts[i]);
+        if (!tr) continue;
 
-    for (auto& [entity, renderer] : renderers)
-    {
-        if (renderer->visible && renderer->mesh && renderer->material)
-        {
-            Transform* transform = world.getComponent<Transform>(entity);
-            if (transform)
-            {
-                glm::mat4 modelMatrix = transform->worldMatrix;
-                glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
+        const glm::mat4& modelMatrix = tr->worldMatrix;
+        const glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
 
-                renderAdapter->setShaderProgram(renderer->material->shaderProgram);
-                renderAdapter->setModelMatrix(glm::value_ptr(modelMatrix));
-                renderAdapter->setViewMatrix(glm::value_ptr(viewMatrix));
-                renderAdapter->setProjectionMatrix(glm::value_ptr(projectionMatrix));
-                renderAdapter->setNormalMatrix(glm::value_ptr(normalMatrix));
+        m_renderAdapter->setShaderProgram(r.material->shaderProgram);
 
-                renderAdapter->setLights(lights);
-                renderAdapter->setMaterial(renderer->material);
-                renderAdapter->drawMesh(renderer->mesh);
-            }
-        }
+        m_renderAdapter->setModelMatrix(glm::value_ptr(modelMatrix));
+        m_renderAdapter->setViewMatrix(viewPtr);
+        m_renderAdapter->setProjectionMatrix(projPtr);
+        m_renderAdapter->setNormalMatrix(glm::value_ptr(normalMatrix));
+
+        m_renderAdapter->setLights(m_lights);
+        m_renderAdapter->setMaterial(r.material);
+        m_renderAdapter->drawMesh(r.mesh);
     }
 }
 
