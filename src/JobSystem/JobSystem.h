@@ -34,7 +34,7 @@ public:
         return true;
     }
 
-    bool pop(T& out) 
+    bool pop(T& out)
     {
         int64_t bottom = m_bottom.load() - 1;
         m_bottom.store(bottom);
@@ -45,7 +45,8 @@ public:
             out = m_buffer[bottom % Capacity];
             if (top == bottom)
             {
-                if (!m_top.compare_exchange_strong(bottom, bottom + 1)) 
+                int64_t expected = top;
+                if (!m_top.compare_exchange_strong(expected, expected + 1))
                 {
                     m_bottom.store(bottom + 1);
                     return false;
@@ -110,6 +111,7 @@ struct Job
     uint32_t start = 0;
     uint32_t end = 0;
     std::atomic<int32_t>* counter = nullptr;
+    const char* name = nullptr;
     Job* next = nullptr;
 };
 
@@ -122,12 +124,14 @@ public:
     JobSystem(const JobSystem&) = delete;
     JobSystem& operator=(const JobSystem&) = delete;
 
+    void registerMainThread();
+
     void execute(Function fn, void* data);
 
-    void parallelFor(uint32_t count, uint32_t batch, Function fn, void* data);
+    void parallelFor(uint32_t count, uint32_t batch, Function fn, void* data, const char* name = nullptr);
 
     void parallelForAsync(uint32_t count, uint32_t batch,
-        Function fn, void* data, JobCounter* counter);
+        Function fn, void* data, JobCounter* counter, const char* name = nullptr);
 
     void wait(JobCounter* counter);
 
@@ -145,7 +149,7 @@ private:
     void workerLoop(uint32_t id);
     Job* allocateJob();
     void freeJob(Job* job);
-    void submit(Job* job, uint32_t preferred);
+    void submit(Job* job);
     bool tryPopJob(uint32_t id, Job*& out);
     bool tryStealJob(uint32_t skipId, Job*& out);
     void executeJob(Job* job);
@@ -156,6 +160,7 @@ private:
     std::vector<std::unique_ptr<Worker>> m_workers;
     std::atomic<bool> m_stop{ false };
     uint32_t m_numWorkers = 0;
+    uint32_t m_totalSlots = 0;
 
     std::mutex m_poolMutex;
     Job* m_freeList = nullptr;

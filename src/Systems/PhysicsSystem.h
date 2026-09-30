@@ -66,9 +66,8 @@ private:
     std::vector<PhysicsEntity> m_entities;
 
     glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
-    float m_fixedTimestep = 1.0f / 60.f;
+    float m_fixedTimestep = 1.0f / 120.f;
     float m_accumulator = 0.0f;
-    int m_maxSubsteps = 5;
 
     bool m_isEnabled = false;
     bool m_debugRendering = true;

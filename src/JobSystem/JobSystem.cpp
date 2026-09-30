@@ -11,9 +11,10 @@ JobSystem::JobSystem(uint32_t numWorkers)
         if (numWorkers == 0) numWorkers = 4;
     }
     m_numWorkers = numWorkers;
+    m_totalSlots = m_numWorkers + 1;
 
-    m_workers.reserve(m_numWorkers);
-    for (uint32_t i = 0; i < m_numWorkers; ++i)
+    m_workers.reserve(m_totalSlots);
+    for (uint32_t i = 0; i < m_totalSlots; ++i)
     {
         m_workers.push_back(std::make_unique<Worker>());
     }
@@ -42,6 +43,11 @@ JobSystem::~JobSystem()
     }
 }
 
+void JobSystem::registerMainThread()
+{
+    m_tlsWorkerIndex = m_numWorkers;
+}
+
 void JobSystem::execute(Function fn, void* data)
 {
     Job* job = allocateJob();
@@ -50,10 +56,10 @@ void JobSystem::execute(Function fn, void* data)
     job->start = 0;
     job->end = 1;
     job->counter = nullptr;
-    submit(job, 0);
+    submit(job);
 }
 
-void JobSystem::parallelFor(uint32_t count, uint32_t batch, Function fn, void* data)
+void JobSystem::parallelFor(uint32_t count, uint32_t batch, Function fn, void* data, const char* name)
 {
     if (count == 0) return;
     if (batch == 0) batch = 1;
@@ -73,13 +79,14 @@ void JobSystem::parallelFor(uint32_t count, uint32_t batch, Function fn, void* d
         job->start = start;
         job->end = end;
         job->counter = &counter.m_count;
-        submit(job, b % m_numWorkers);
+        job->name = name;
+        submit(job);
     }
 
     wait(&counter);
 }
 
-void JobSystem::parallelForAsync(uint32_t count, uint32_t batch, Function fn, void* data, JobCounter* counter)
+void JobSystem::parallelForAsync(uint32_t count, uint32_t batch, Function fn, void* data, JobCounter* counter, const char* name)
 {
     if (count == 0) 
     {
@@ -102,7 +109,8 @@ void JobSystem::parallelForAsync(uint32_t count, uint32_t batch, Function fn, vo
         job->start = start;
         job->end = end;
         job->counter = &counter->m_count;
-        submit(job, b % m_numWorkers);
+        job->name = name;
+        submit(job);
     }
 }
 
@@ -127,7 +135,7 @@ void JobSystem::wait(JobCounter* counter)
         // Then steal from others.
         if (!didWork) 
         {
-            for (uint32_t i = 0; i < m_numWorkers; ++i) 
+            for (uint32_t i = 0; i < m_totalSlots; ++i)
             {
                 if (i == myIdx) continue;
                 if (m_workers[i]->m_deque.steal(job))
@@ -159,27 +167,27 @@ void JobSystem::workerLoop(uint32_t id)
         Job* job = nullptr;
 
         {
-            ZoneScopedN("Worker::PopLocal");
             // 1. Try our own deque
             if (tryPopJob(id, job))
             {
+                ZoneScopedN("Worker::PopLocal");
                 executeJob(job);
                 continue;
             }
         }
 
         {
-            ZoneScopedN("Worker::Steal");
             // 2. Try to steal from someone else.
             if (tryStealJob(id, job))
             {
+                ZoneScopedN("Worker::Steal");
                 executeJob(job);
                 continue;
             }
         }
 
         {
-            ZoneScopedN("Worker::Idle");
+            //ZoneScopedN("Worker::Idle");
             // 3. Nothing to do — wait briefly.
             std::unique_lock<std::mutex> lock(m_cvMutex);
             m_cv.wait_for(lock, std::chrono::microseconds(100), [this, id] {
@@ -217,12 +225,12 @@ void JobSystem::freeJob(Job* job)
     m_freeList = job;
 }
 
-void JobSystem::submit(Job* job, uint32_t preferred)
+void JobSystem::submit(Job* job)
 {
     uint32_t idx = m_tlsWorkerIndex;
     if (idx == UINT32_MAX)
     {
-        idx = preferred < m_numWorkers ? preferred : 0;
+        idx = m_numWorkers;
     }
 
     Worker& w = *m_workers[idx];
@@ -249,9 +257,9 @@ bool JobSystem::tryPopJob(uint32_t id, Job*& out)
 
 bool JobSystem::tryStealJob(uint32_t skipId, Job*& out)
 {
-    for (uint32_t i = 1; i <= m_numWorkers; ++i) 
+    for (uint32_t i = 1; i <= m_totalSlots; ++i)
     {
-        uint32_t victim = (skipId + i) % m_numWorkers;
+        uint32_t victim = (skipId + i) % m_totalSlots;
         if (m_workers[victim]->m_deque.steal(out))
         {
             return true;
@@ -263,6 +271,10 @@ bool JobSystem::tryStealJob(uint32_t skipId, Job*& out)
 void JobSystem::executeJob(Job* job)
 {
     ZoneScopedN("Job");
+    if (job->name) 
+    {
+        ZoneName(job->name, strlen(job->name));
+    }
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "Range: [%u, %u)", job->start, job->end);
     ZoneText(buffer, strlen(buffer));
@@ -272,13 +284,13 @@ void JobSystem::executeJob(Job* job)
         job->fn(job->data, i);
     }
 
-    if (job->counter) 
+    freeJob(job);
+
+    if (job->counter)
     {
-        if (job->counter->fetch_sub(1) == 1) 
+        if (job->counter->fetch_sub(1) == 0)
         {
             m_cv.notify_all();
         }
     }
-
-    freeJob(job);
 }

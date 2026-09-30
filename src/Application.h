@@ -13,7 +13,7 @@
 class Application
 {
 public:
-    Application() : m_jobs(0) {}
+    Application();
     ~Application();
     bool initialize(int width, int height, const std::string& title);
     void run();

@@ -9,8 +9,15 @@
 #include "Resources/ShaderLoader/ShaderLoader.h"
 #include "tracy/Tracy.hpp"
 
+Application::Application()
+{
+    m_jobs = new JobSystem(8);
+    m_jobs->registerMainThread();
+}
+
 Application::~Application()
 {
+    delete m_jobs;
 }
 
 bool Application::initialize(int width, int height, const std::string& title)

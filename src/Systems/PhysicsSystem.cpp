@@ -26,7 +26,15 @@ namespace
         auto& rb = *ctx->entities[i].rigidbody;
 
         if (rb.useGravity && !rb.isKinematic)
+        {
             rb.velocity += ctx->gravity * ctx->dt;
+        }
+
+        int counter = 0;
+        for (int i = 0; i < 100000; ++i)
+        {
+            counter++;
+        }
     }
 
     struct IntegrateCtx
@@ -46,6 +54,12 @@ namespace
         rb.velocity += rb.acceleration * ctx->dt;
         e.transform->position += rb.velocity * ctx->dt;
         rb.acceleration = glm::vec3(0.0f);
+
+        int counter = 0;
+        for (int i = 0; i < 100000; ++i)
+        {
+            counter++;
+        }
     }
 }
 
@@ -77,23 +91,19 @@ void PhysicsSystem::update(World& world, JobSystem* jobs, float deltaTime)
 
     m_accumulator += deltaTime;
 
-    const float maxAccum = m_fixedTimestep * static_cast<float>(m_maxSubsteps);
-    if (m_accumulator > maxAccum)
-        m_accumulator = maxAccum;
-
-    while (m_accumulator >= m_fixedTimestep)
+    //while (m_accumulator >= m_fixedTimestep)
     {
-        ZoneScopedN("Physics::Substep");
+        ZoneScopedN("Physics::Step");
 
         if (jobs)
         {
-            applyGravityParallel(jobs, m_fixedTimestep);
-            updatePositionsParallel(jobs, m_fixedTimestep);
+            applyGravityParallel(jobs, deltaTime);
+            updatePositionsParallel(jobs, deltaTime);
         }
         else
         {
-            applyGravity(m_fixedTimestep);
-            updatePositions(m_fixedTimestep);
+            applyGravity(deltaTime);
+            updatePositions(deltaTime);
         }
 
         detectAndResolveCollisions();
@@ -146,6 +156,12 @@ void PhysicsSystem::applyGravity(float dt)
         {
             rb.velocity += m_gravity * dt;
         }
+
+        int counter = 0;
+        for (int i = 0; i < 100000; ++i)
+        {
+            counter++;
+        }
     }
 }
 
@@ -161,6 +177,12 @@ void PhysicsSystem::updatePositions(float dt)
         rb.velocity += rb.acceleration * dt;
         e.transform->position += rb.velocity * dt;
         rb.acceleration = glm::vec3(0.0f);
+
+        int counter = 0;
+        for (int i = 0; i < 100000; ++i)
+        {
+            counter++;
+        }
     }
 }
 
@@ -205,10 +227,10 @@ void PhysicsSystem::applyGravityParallel(JobSystem* jobs, float dt)
     GravityCtx ctx{ m_entities.data(), m_gravity, dt };
 
     const uint32_t count = static_cast<uint32_t>(m_entities.size());
-    const uint32_t batch = std::max(64u,
+    const uint32_t batch = std::max(8u,
         count / (jobs->getNumWorkers() * 4));
 
-    jobs->parallelFor(count, batch, applyGravityJob, &ctx);
+    jobs->parallelFor(count, batch, applyGravityJob, &ctx, "Physics::Gravity (parallel)");
 }
 
 void PhysicsSystem::updatePositionsParallel(JobSystem* jobs, float dt)
@@ -220,10 +242,10 @@ void PhysicsSystem::updatePositionsParallel(JobSystem* jobs, float dt)
     IntegrateCtx ctx{ m_entities.data(), dt };
 
     const uint32_t count = static_cast<uint32_t>(m_entities.size());
-    const uint32_t batch = std::max(64u,
+    const uint32_t batch = std::max(8u,
         count / (jobs->getNumWorkers() * 4));
 
-    jobs->parallelFor(count, batch, integratePositionsJob, &ctx);
+    jobs->parallelFor(count, batch, integratePositionsJob, &ctx, "Physics::Integrate (parallel)");
 }
 
 void PhysicsSystem::renderDebugColliders(World& world)
