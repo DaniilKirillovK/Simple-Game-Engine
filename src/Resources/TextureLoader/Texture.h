@@ -43,14 +43,12 @@ struct TextureData
         cleanup();
     }
 
-    void cleanup() 
-    {
-        if (pixels) 
-        {
-            delete[] pixels;
-            pixels = nullptr;
-        }
-    }
+    // ИСПРАВЛЕНИЕ освобождения памяти. Раньше тело было здесь же и делало delete[] pixels.
+    // Но пиксели выделяет stbi_load (через malloc), а не new[]. Освобождать память другим
+    // семейством функций — неопределённое поведение (в Release могло проявиться крашем).
+    // Теперь реализация вынесена в Texture.cpp и вызывает stbi_image_free. Объявление здесь
+    // осталось, чтобы не тянуть stb_image.h во все файлы, включающие Texture.h.
+    void cleanup();
 
     uint32_t getInternalFormat() const;
 
@@ -65,6 +63,14 @@ public:
     int m_height = 0;
     int m_channels = 0;
     std::string m_path;
+
+    // Признак «настоящая картинка уже загружена».
+    // false — пока идёт фоновая загрузка: m_handle указывает на общую белую текстуру 1x1
+    // (заглушка), а размеры равны 1x1. AssetLoader заполняет ЭТОТ ЖЕ объект на месте
+    // (меняет m_handle, размеры и ставит ready = true), поэтому все Material, уже хранящие
+    // указатель на текстуру, получают результат автоматически, без пересоздания.
+    // По умолчанию true: текстуры, созданные синхронно, всегда готовы.
+    bool ready = true;
 
     Texture() = default;
     Texture(uint32_t handle, const TextureData& data, const std::string& path)
@@ -85,7 +91,8 @@ public:
         , m_width(other.m_width)
         , m_height(other.m_height)
         , m_channels(other.m_channels)
-        , m_path(std::move(other.m_path)) 
+        , m_path(std::move(other.m_path))
+        , ready(other.ready) // флаг обязан переезжать вместе с данными: AssetLoader заполняет заглушку через move-присваивание
     {
         other.m_handle = 0;
     }
@@ -98,6 +105,7 @@ public:
             m_height = other.m_height;
             m_channels = other.m_channels;
             m_path = std::move(other.m_path);
+            ready = other.ready; // см. комментарий в move-конструкторе
             other.m_handle = 0;
         }
         return *this;

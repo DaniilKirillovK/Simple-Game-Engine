@@ -8,6 +8,7 @@
 
 #include <glm/glm.hpp>
 #include <stdexcept>
+#include "tracy/Tracy.hpp"
 
 std::unique_ptr<Mesh> MeshLoader::loadModel(const std::string& filepath)
 {
@@ -145,6 +146,11 @@ std::string MeshLoader::extractDirectory(const std::string& filepath)
 
 std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
 {
+    // TRACY: полная загрузка меша (Assimp + сборка вершин/индексов, весь этот код — CPU).
+    // Как и у текстур, зона одна и для синхронного пути, и для воркера.
+    ZoneScopedN("MeshLoader::loadMesh");
+    ZoneText(filepath.c_str(), filepath.size());
+
     Assimp::Importer importer;
 
     const aiScene* scene = importer.ReadFile(filepath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);

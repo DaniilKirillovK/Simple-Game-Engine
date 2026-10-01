@@ -26,6 +26,10 @@ GameplayState::GameplayState(IRenderAdapter& renderer)
 
 void GameplayState::onEnter()
 {
+    // TRACY: вход в состояние включает загрузку тестовой сцены (setupTestScene), то есть
+    // самую тяжёлую часть старта. Зона вне кадра (до первого FrameMark), в Tracy видна на таймлайне.
+    ZoneScopedN("GameplayState::onEnter");
+
     m_world = new World();
 
     m_world->addSystem(std::make_unique<PhysicsSystem>(&m_renderer));

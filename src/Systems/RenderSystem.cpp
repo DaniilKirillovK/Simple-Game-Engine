@@ -72,6 +72,8 @@ void RenderSystem::update(World& world, JobSystem* jobs, float deltaTime)
         auto& r = renderers[i];
         if (!r.visible || !r.mesh || !r.material) continue;
 
+        if (!r.mesh->ready) continue;
+
         Transform* tr = tPool.getComponent(rendererEnts[i]);
         if (!tr) continue;
 

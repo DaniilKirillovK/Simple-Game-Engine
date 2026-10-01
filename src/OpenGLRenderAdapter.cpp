@@ -14,6 +14,8 @@
 
 #include "Resources/ShaderLoader/ShaderProgram.h"
 #include "Resources/TextureLoader/Texture.h"
+#include "tracy/Tracy.hpp"
+#include "Resources/AssetLoader.h" // асинхронная загрузка: окно ассетов теперь запрашивает ресурсы через AssetLoader
 #include "Common/KeyCode.h"
 #include "libs/imgui/imgui.h"
 #include "libs/imgui/backends/imgui_impl_glfw.h"
@@ -233,6 +235,11 @@ void OpenGLRenderAdapter::onMouseScroll(double xoffset, double yoffset)
 
 uint32_t OpenGLRenderAdapter::createTexture(const TextureData& data)
 {
+    // TRACY: чистое время OpenGL-загрузки текстуры (glTexImage2D + glGenerateMipmap).
+    // Это та часть, которая обязана оставаться в главном потоке; по зоне видно, укладывается
+    // ли она в бюджет pump (2 мс) для больших текстур.
+    ZoneScopedN("GL::createTexture");
+
     if (!data.pixels || data.width <= 0 || data.height <= 0) 
     {
         LOG_ERROR("OpenGLRenderAdapter: Invalid texture data");
@@ -540,7 +547,13 @@ void OpenGLRenderAdapter::drawDebugSphere(const glm::vec3& center, float radius,
 
 void OpenGLRenderAdapter::drawMesh(const Mesh *mesh)
 {
-    if (!mesh)
+    // Меш с ready == false — это пустая заглушка, которую AssetLoader ещё не заполнил.
+    // Рисовать его нельзя по важной причине: createMeshVAO ниже создаст для него VAO и
+    // сохранит в meshVAOs (ключ — указатель на Mesh). Позже меш заполнится «на месте»
+    // (тот же указатель), но createMeshVAO увидит, что запись уже есть, и не пересоздаст
+    // буферы: на экране навсегда осталась бы пустая геометрия. Вторая такая же проверка
+    // стоит в RenderSystem, здесь она нужна как защита для других вызывающих.
+    if (!mesh || !mesh->ready)
         return;
 
     createMeshVAO(const_cast<Mesh*>(mesh));
@@ -1394,8 +1407,10 @@ void OpenGLRenderAdapter::renderLogPanel()
 
     ImGui::Checkbox("Auto-scroll", &m_autoScrollLogs);
     ImGui::SameLine();
-    if (ImGui::Button("Clear")) 
+    if (ImGui::Button("Clear"))
     {
+        // Очистка буфера логов под мьютексом: в это время воркер может добавлять запись.
+        std::lock_guard<std::mutex> lock(m_logMutex);
         m_logEntries.clear();
     }
     ImGui::SameLine();
@@ -1416,6 +1431,11 @@ void OpenGLRenderAdapter::renderLogPanel()
 
     ImGui::BeginChild("LogScrollRegion", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
 
+    // Блокируем буфер логов на время обхода: addLogEntry может вызываться из воркера и
+    // менять вектор (push_back / erase). Используем unique_lock, а не lock_guard, потому
+    // что мьютекс нужно отпустить вручную сразу после цикла (см. logLock.unlock() ниже),
+    // чтобы не держать его во время вызовов ImGui для прокрутки.
+    std::unique_lock<std::mutex> logLock(m_logMutex);
     for (const auto& entry : m_logEntries)
     {
         bool shouldShow = false;
@@ -1446,6 +1466,8 @@ void OpenGLRenderAdapter::renderLogPanel()
         ImGui::TextUnformatted(entry.message.c_str());
         ImGui::PopStyleColor();
     }
+    // Обход закончен — отпускаем мьютекс, чтобы воркеры не ждали, пока ImGui считает прокрутку.
+    logLock.unlock();
 
     if (m_autoScrollLogs && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) 
     {
@@ -1459,6 +1481,10 @@ void OpenGLRenderAdapter::renderLogPanel()
 
 void OpenGLRenderAdapter::renderAssetBrowser()
 {
+    // TRACY: время отрисовки окна ассетов. «До» при входе в папку с картинками здесь был
+    // фриз (синхронное декодирование превью), «после» зона остаётся короткой.
+    ZoneScopedN("AssetBrowser::render");
+
     if (!m_showAssetBrowser) return;
 
     ImGui::Begin("Asset Browser");
@@ -1551,8 +1577,15 @@ void OpenGLRenderAdapter::renderAssetBrowser()
         }
         else if (asset.extension == ".png" || asset.extension == ".jpg" || asset.extension == ".jpeg")
         {
-            auto textureResource = RESOURCE_MANAGER.load<Texture>(asset.path);
-            if (textureResource && textureResource->isValid())
+            // БЫЛО: RESOURCE_MANAGER.load<Texture>(...) — синхронная загрузка прямо в цикле
+            // отрисовки: при входе в папку с картинками главный поток вставал на декодировании
+            // каждой из них (фриз кадра).
+            // СТАЛО: requestTexture сразу возвращает ресурс и отправляет декодирование в фон.
+            // Пока картинка не готова (isReady() == false), вместо превью рисуется подпись [TEX].
+            // Когда путь уже известен, вызов превращается в дешёвый поиск в кэше, так что
+            // повторные запросы на каждом кадре не создают новых задач.
+            auto textureResource = AssetLoader::getInstance().requestTexture(asset.path);
+            if (textureResource && textureResource->isReady() && textureResource->isValid())
             {
                 Texture* tex = textureResource->get();
                 unsigned int textureID = tex->m_handle;
@@ -1593,7 +1626,11 @@ void OpenGLRenderAdapter::renderAssetBrowser()
 
                 if (asset.extension == ".png" || asset.extension == ".jpg" || asset.extension == ".jpeg")
                 {
-                    auto textureResource = RESOURCE_MANAGER.load<Texture>(asset.path);
+                    // Выбранная текстура — это сам объект Texture, который может ещё быть
+                    // заглушкой (белая 1x1). Когда загрузка завершится, AssetLoader заполнит
+                    // этот же объект на месте, так что m_selectedTexture обновится сам и
+                    // повторно указатель присваивать не нужно.
+                    auto textureResource = AssetLoader::getInstance().requestTexture(asset.path);
                     if (textureResource && textureResource->isValid())
                     {
                         m_selectedTexture = textureResource->get();
@@ -1602,7 +1639,10 @@ void OpenGLRenderAdapter::renderAssetBrowser()
 
                 else if (asset.extension == ".obj" || asset.extension == ".fbx")
                 {
-                    auto meshResource = RESOURCE_MANAGER.load<Mesh>(asset.path);
+                    // Меш запрашивается асинхронно (раньше load<Mesh> блокировал кадр на время
+                    // работы Assimp). Возвращается пустая заглушка с ready == false, которая
+                    // заполнится на месте по завершении загрузки.
+                    auto meshResource = AssetLoader::getInstance().requestMesh(asset.path);
                     if (meshResource && meshResource->isValid())
                     {
                         m_selectedMesh = meshResource->get();
@@ -1632,9 +1672,23 @@ void OpenGLRenderAdapter::renderAssetBrowser()
             || std::filesystem::path(m_currentAssetPath).extension().string() == ".fbx")
         {
             ImGui::Text("Type: 3D Model");
-            ImGui::Text("Vertices: %d", m_selectedMesh->vertices.size());
-            ImGui::Text("Indices: %d", m_selectedMesh->indices.size());
-            if (ImGui::Button("Create Object from Asset"))
+            // Проверки на nullptr добавлены, потому что раньше m_selectedMesh разыменовывался
+            // без проверки (вылет, если меш не выбран/не загрузился). Пока меш грузится,
+            // вместо счётчиков вершин показываем «Loading...». Формат %d заменён на %zu:
+            // size() возвращает size_t, и %d для него — неопределённое поведение.
+            if (m_selectedMesh && !m_selectedMesh->ready)
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Loading...");
+            }
+            else if (m_selectedMesh)
+            {
+                ImGui::Text("Vertices: %zu", m_selectedMesh->vertices.size());
+                ImGui::Text("Indices: %zu", m_selectedMesh->indices.size());
+            }
+
+            // Создать объект из ещё не загруженного меша можно намеренно: сущность появится
+            // в сцене сразу, а RenderSystem начнёт её рисовать, как только меш станет ready.
+            if (m_selectedMesh && ImGui::Button("Create Object from Asset"))
             {
                 if (m_onCreateFromAssetCallback)
                 {
@@ -1646,8 +1700,18 @@ void OpenGLRenderAdapter::renderAssetBrowser()
             || std::filesystem::path(m_currentAssetPath).extension().string() == ".jpg")
         {
             ImGui::Text("Type: Texture");
-            ImGui::Text("Size: %dx%d", m_selectedTexture->m_width, m_selectedTexture->m_height);
-            if (ImGui::Button("Apply to Selected Object"))
+            // Аналогично мешу: защита от nullptr и пометка «Loading...», пока вместо
+            // настоящих размеров в объекте лежит заглушка 1x1.
+            if (m_selectedTexture && !m_selectedTexture->ready)
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Loading...");
+            }
+            else if (m_selectedTexture)
+            {
+                ImGui::Text("Size: %dx%d", m_selectedTexture->m_width, m_selectedTexture->m_height);
+            }
+
+            if (m_selectedTexture && ImGui::Button("Apply to Selected Object"))
             {
                 if (m_selectedEntity != -1 && m_world)
                 {
@@ -1712,6 +1776,11 @@ void OpenGLRenderAdapter::addLogEntry(LogLevel level, const std::string& message
     entry.message = formatted;
     entry.level = level;
     entry.timestamp = now;
+
+    // Эта функция вызывается из callback логгера, а значит из ЛЮБОГО потока (воркеры тоже
+    // пишут в лог). Строки выше работают только с локальными переменными и безопасны,
+    // а общий вектор m_logEntries защищаем мьютексом.
+    std::lock_guard<std::mutex> lock(m_logMutex);
     m_logEntries.push_back(entry);
 
     while (m_logEntries.size() > m_maxLogEntries) 

@@ -4,6 +4,7 @@
 #include "GameplayState.h"
 #include "OpenGLRenderAdapter.h"
 #include "Resources/ResourceManager.h"
+#include "Resources/AssetLoader.h" // сервис асинхронной загрузки мешей и текстур (инициализация, pump, shutdown)
 #include "Resources/MeshLoader/MeshLoader.h"
 #include "Resources/TextureLoader/TextureLoader.h"
 #include "Resources/ShaderLoader/ShaderLoader.h"
@@ -17,6 +18,7 @@ Application::Application()
 
 Application::~Application()
 {
+    AssetLoader::getInstance().shutdown();
     delete m_jobs;
 }
 
@@ -34,6 +36,7 @@ bool Application::initialize(int width, int height, const std::string& title)
     MeshLoader::getInstance().registerLoader();
 	TextureLoader::getInstance().registerLoader(renderer.get());
     ShaderLoader::getInstance().registerLoader(renderer.get());
+    AssetLoader::getInstance().initialize(m_jobs, renderer.get());
 
     currentState = std::make_unique<GameplayState>(*renderer);
     currentState->onEnter();
@@ -101,7 +104,14 @@ void Application::handleEvents()
 
 void Application::update(float deltaTime)
 {
-    if (currentState) 
+    // «Памп» завершённых фоновых загрузок. В начале каждого кадра главный поток забирает
+    // результаты декодирования из воркеров и выполняет их GPU-часть (загрузка текстур в
+    // видеопамять, пометка меша готовым). Лимит 2 мс на кадр: если за кадр пришло много
+    // ресурсов, остальные дождутся следующих кадров, и кадр не растянется. Вызов стоит ДО
+    // обновления мира, чтобы системы в этом кадре уже видели готовые ресурсы.
+    AssetLoader::getInstance().pump(2.0f);
+
+    if (currentState)
     {
         currentState->update(m_jobs, deltaTime);
         if (currentState->isFinished()) 

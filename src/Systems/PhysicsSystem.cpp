@@ -61,6 +61,60 @@ namespace
             counter++;
         }
     }
+
+    struct BroadNarrowCtx
+    {
+        PhysicsSystem::PhysicsEntity* entities;
+        uint32_t count;
+        uint32_t jobIdx;
+        uint32_t numJobs;
+        std::vector<PhysicsSystem::Contact>* output;
+    };
+
+    void broadNarrowJob(void* raw, uint32_t i)
+    {
+        auto* ctx = static_cast<BroadNarrowCtx*>(raw);
+        auto* ents = ctx->entities;
+        const uint32_t N = ctx->count;
+        const uint32_t stride = ctx->numJobs;
+        auto& out = *ctx->output;
+
+        for (uint32_t i = ctx->jobIdx; i < N; i += stride)
+        {
+            auto& A = ents[i];
+
+            for (uint32_t j = i + 1; j < N; ++j)
+            {
+                auto& B = ents[j];
+
+                CollisionInfo info;
+                if (!PhysicsSystem::checkCollision(
+                    *A.collider, *A.transform,
+                    *B.collider, *B.transform,
+                    info))
+                    continue;
+
+                if (A.collider->isTrigger || B.collider->isTrigger)
+                    continue;
+
+                info.entityA = A.id;
+                info.entityB = B.id;
+
+                out.push_back({ &A, &B, info });
+            }
+        }
+    }
+
+    struct MultiBroadNarrowCtx
+    {
+        BroadNarrowCtx* ctxs;
+    };
+
+    void broadNarrowMultiJob(void* raw, uint32_t jobIdx)
+    {
+        auto* mc = static_cast<MultiBroadNarrowCtx*>(raw);
+        broadNarrowJob(&mc->ctxs[jobIdx], jobIdx);
+    }
 }
 
 PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
@@ -106,7 +160,14 @@ void PhysicsSystem::update(World& world, JobSystem* jobs, float deltaTime)
             updatePositions(deltaTime);
         }
 
-        detectAndResolveCollisions();
+        if (jobs)
+        {
+            detectAndResolveCollisionsParallel(jobs);
+        }
+        else
+        {
+            detectAndResolveCollisions();
+        }
 
         m_accumulator -= m_fixedTimestep;
     }
@@ -195,25 +256,63 @@ void PhysicsSystem::detectAndResolveCollisions()
     for (size_t i = 0; i < n; ++i)
     {
         auto& A = m_entities[i];
-
         for (size_t j = i + 1; j < n; ++j)
         {
             auto& B = m_entities[j];
 
             CollisionInfo info;
-
             if (!checkCollision(*A.collider, *A.transform,
-                *B.collider, *B.transform,
-                info)) continue;
+                *B.collider, *B.transform, info))
+                continue;
 
             info.entityA = A.id;
             info.entityB = B.id;
 
-            if (A.collider->isTrigger || B.collider->isTrigger)
-                continue;
+            if (A.collider->isTrigger || B.collider->isTrigger) continue;
 
             resolveCollision(info, *A.rigidbody, *B.rigidbody,
                 *A.transform, *B.transform);
+        }
+    }
+}
+
+void PhysicsSystem::detectAndResolveCollisionsParallel(JobSystem* jobs)
+{
+    ZoneScopedN("Physics::DetectAndResolve (parallel)");
+
+    const uint32_t N = static_cast<uint32_t>(m_entities.size());
+    if (N < 2) return;
+
+    const uint32_t numJobs = std::max(1u, jobs->getNumWorkers());
+
+    if (m_contactBuffers.size() < numJobs)
+        m_contactBuffers.resize(numJobs);
+
+    std::vector<BroadNarrowCtx> ctxs(numJobs);
+    for (uint32_t k = 0; k < numJobs; ++k)
+    {
+        m_contactBuffers[k].clear();
+        m_contactBuffers[k].reserve(64);
+        ctxs[k] = { m_entities.data(), N, k, numJobs, &m_contactBuffers[k] };
+    }
+
+    {
+        ZoneScopedN("Physics::BroadNarrow (parallel)");
+        MultiBroadNarrowCtx mc{ ctxs.data() };
+        jobs->parallelFor(numJobs, 1, broadNarrowMultiJob, &mc,
+            "Physics::BroadNarrow");
+    }
+
+    {
+        ZoneScopedN("Physics::Resolve (serial)");
+        for (auto& buf : m_contactBuffers)
+        {
+            for (auto& c : buf)
+            {
+                resolveCollision(c.info,
+                    *c.a->rigidbody, *c.b->rigidbody,
+                    *c.a->transform, *c.b->transform);
+            }
         }
     }
 }

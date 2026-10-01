@@ -5,7 +5,9 @@
 #include <set>
 #include "Components/Material.h"
 #include "Resources/ResourceManager.h"
+#include "Resources/AssetLoader.h" // асинхронные запросы мешей и текстур при загрузке сцены
 #include "MeshFactory.h"
+#include "tracy/Tracy.hpp"
 
 bool SceneSerializer::saveScene(World& world, const std::string& filepath)
 {
@@ -34,7 +36,13 @@ bool SceneSerializer::saveScene(World& world, const std::string& filepath)
 
 bool SceneSerializer::loadScene(IRenderAdapter& renderAdapter, World& world, const std::string& filepath)
 {
-    try 
+    // TRACY: главная метрика для демонстрации. Время загрузки сцены в главном потоке:
+    // «до» — длинное (внутри синхронно грузятся все меши и текстуры), «после» — короткое
+    // (только разбор JSON и отправка запросов). Вызывается и при старте, и при выходе из Play-режима.
+    ZoneScopedN("SceneSerializer::loadScene");
+    ZoneText(filepath.c_str(), filepath.size());
+
+    try
     {
         std::ifstream file("../../../" + filepath);
         if (!file.is_open()) 
@@ -534,15 +542,22 @@ void SceneSerializer::deserializeMeshRenderer(IRenderAdapter& renderAdapter, Mes
         if (meshJson.contains("path") && !meshJson["path"].get<std::string>().empty()) 
         {
             std::string meshPath = meshJson["path"].get<std::string>();
-            auto meshResource = RESOURCE_MANAGER.load<Mesh>(meshPath);
-            if (meshResource && meshResource->isValid()) 
+            // БЫЛО: RESOURCE_MANAGER.load<Mesh>(meshPath) — синхронная загрузка: пока Assimp
+            // разбирал модель, главный поток стоял, и загрузка сцены с несколькими тяжёлыми
+            // моделями замораживала кадры.
+            // СТАЛО: requestMesh возвращает ресурс МГНОВЕННО. Внутри лежит пустая заглушка
+            // (ready == false), которую RenderSystem пропускает. Настоящие данные декодируются
+            // в воркере и подставляются в этот же объект на месте через AssetLoader::pump.
+            // Указатель renderer.mesh остаётся валидным всё время, менять его позже не нужно.
+            auto meshResource = AssetLoader::getInstance().requestMesh(meshPath);
+            if (meshResource && meshResource->isValid())
             {
                 renderer.mesh = meshResource->get();
-                LOG_INFO("Loaded mesh from file: " + meshPath);
+                LOG_INFO("Requested mesh: " + meshPath);
             }
-            else 
+            else
             {
-                LOG_WARNING("Failed to load mesh: " + meshPath);
+                LOG_WARNING("Failed to request mesh: " + meshPath);
             }
         }
         else if (meshJson.contains("type")) 
@@ -586,17 +601,32 @@ void SceneSerializer::deserializeMeshRenderer(IRenderAdapter& renderAdapter, Mes
             shininess = mat["shininess"].get<float>();
         }
 
+        // Шейдеры остаются СИНХРОННЫМИ: они маленькие и их мало, а конструктор Material сразу
+        // линкует программу и запрашивает uniform-ы, то есть ему нужны уже скомпилированные
+        // GL-идентификаторы. Чтобы сделать их асинхронными, пришлось бы переделать Material.
+        // ИСПРАВЛЕНИЕ: раньше было load<Shader>(...)->get() без проверки. Если шейдер не
+        // найден или не скомпилировался, load возвращал nullptr, и вызов ->get() падал.
         Shader* vertShader = nullptr;
         Shader* fragShader = nullptr;
         if (mat.contains("vertex_shader_path"))
         {
-            vertShader = RESOURCE_MANAGER.load<Shader>(mat["vertex_shader_path"])->get();
+            auto shaderResource = RESOURCE_MANAGER.load<Shader>(mat["vertex_shader_path"].get<std::string>());
+            if (shaderResource) vertShader = shaderResource->get();
         }
         if (mat.contains("fragment_shader_path"))
         {
-            fragShader = RESOURCE_MANAGER.load<Shader>(mat["fragment_shader_path"])->get();
+            auto shaderResource = RESOURCE_MANAGER.load<Shader>(mat["fragment_shader_path"].get<std::string>());
+            if (shaderResource) fragShader = shaderResource->get();
         }
-        
+
+        // Без обоих шейдеров материал создать нельзя (конструктор Material разыменует
+        // указатели). Раньше это было падением; теперь материал пропускается с записью в лог,
+        // а у объекта renderer.material остаётся nullptr, и RenderSystem такой объект не рисует.
+        if (!vertShader || !fragShader)
+        {
+            LOG_ERROR("Scene material skipped: vertex/fragment shader is missing or failed to compile");
+            return;
+        }
 
         Material* material = new Material{
             diffuseColor, vertShader, fragShader, renderAdapter
@@ -607,12 +637,18 @@ void SceneSerializer::deserializeMeshRenderer(IRenderAdapter& renderAdapter, Mes
             if (mat.contains("diffuse_texture_path")) 
             {
                 std::string texturePath = mat["diffuse_texture_path"].get<std::string>();
-                auto textureResource = RESOURCE_MANAGER.load<Texture>(texturePath);
-                if (textureResource && textureResource->isValid()) 
+                // БЫЛО: load<Texture> — синхронное декодирование (stb_image) и загрузка в GPU
+                // прямо во время загрузки сцены.
+                // СТАЛО: requestTexture сразу отдаёт объект Texture, который пока указывает на
+                // белую заглушку 1x1. Декодирование идёт в воркере, а когда картинка загрузится
+                // в GPU, AssetLoader подменит handle в ЭТОМ ЖЕ объекте. Поэтому material->diffuseTexture
+                // менять не нужно: материал сам «подхватит» настоящую текстуру.
+                auto textureResource = AssetLoader::getInstance().requestTexture(texturePath);
+                if (textureResource && textureResource->isValid())
                 {
                     material->diffuseTexture = textureResource->get();
                     material->hasTexture = true;
-                    LOG_INFO("Loaded texture: " + texturePath);
+                    LOG_INFO("Requested texture: " + texturePath);
                 }
             }
         }

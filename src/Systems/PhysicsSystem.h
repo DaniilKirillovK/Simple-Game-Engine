@@ -31,10 +31,25 @@ public:
         Collider* collider;
     };
 
+    struct Contact
+    {
+        PhysicsEntity* a = nullptr;
+        PhysicsEntity* b = nullptr;
+        CollisionInfo  info;
+    };
+
     PhysicsSystem(IRenderAdapter* renderAdapter);
 
     virtual void update(World& world, JobSystem* jobs, float deltaTime) override;
     virtual void setEnabled(bool isEnabled) override;
+
+    static bool checkCollision(const Collider& a, const Transform& transformA,
+        const Collider& b, const Transform& transformB,
+        CollisionInfo& outInfo);
+
+    static void resolveCollision(CollisionInfo& info,
+        Rigidbody& rbA, Rigidbody& rbB,
+        Transform& transformA, Transform& transformB);
 
     void setGravity(const glm::vec3& gravity) { m_gravity = gravity; }
     glm::vec3 getGravity() const { return m_gravity; }
@@ -46,24 +61,19 @@ public:
 private:
     void gatherEntities(World& world);
 
-    void applyGravity(float dt);
-    void updatePositions(float dt);
     void detectAndResolveCollisions();
+    void detectAndResolveCollisionsParallel(JobSystem*);
 
+    void applyGravity(float dt);
     void applyGravityParallel(JobSystem* jobs, float dt);
+
+    void updatePositions(float dt);
     void updatePositionsParallel(JobSystem* jobs, float dt);
 
     void renderDebugColliders(World& world);
 
-    bool checkCollision(const Collider& a, const Transform& transformA,
-        const Collider& b, const Transform& transformB,
-        CollisionInfo& outInfo);
-
-    void resolveCollision(CollisionInfo& info,
-        Rigidbody& rbA, Rigidbody& rbB,
-        Transform& transformA, Transform& transformB);
-
     std::vector<PhysicsEntity> m_entities;
+    std::vector<std::vector<Contact>> m_contactBuffers;
 
     glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
     float m_fixedTimestep = 1.0f / 120.f;

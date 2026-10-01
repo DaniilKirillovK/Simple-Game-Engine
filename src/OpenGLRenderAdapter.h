@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <mutex> // для m_logMutex (потокобезопасный буфер логов)
 #include <glm/glm.hpp>
 #include "libs/imgui/imgui.h"
 #include "Entity.h"
@@ -226,6 +227,10 @@ private:
 
     // Log
     std::vector<LogEntry> m_logEntries;
+    // Защищает m_logEntries. LOG_* вызывается из воркеров job system, и callback логгера
+    // добавляет запись в этот вектор, пока главный поток в это же время рисует панель логов
+    // через ImGui. Без мьютекса это гонка данных (вектор мог бы перевыделиться во время обхода).
+    std::mutex m_logMutex;
     int m_maxLogEntries = 2000;
     bool m_autoScrollLogs = true;
     bool m_showInfo = true;

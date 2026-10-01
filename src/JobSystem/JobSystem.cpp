@@ -56,6 +56,9 @@ void JobSystem::execute(Function fn, void* data)
     job->start = 0;
     job->end = 1;
     job->counter = nullptr;
+    // Структуры Job переиспользуются из пула, и поля не обнуляются при возврате. Если не
+    // сбросить name здесь, в Tracy у этого job-а появилось бы имя от прошлого владельца структуры.
+    job->name = nullptr;
     submit(job);
 }
 
@@ -284,13 +287,20 @@ void JobSystem::executeJob(Job* job)
         job->fn(job->data, i);
     }
 
+    // ИСПРАВЛЕНИЕ гонки (use-after-free). Раньше freeJob(job) вызывался ДО чтения job->counter.
+    // Но после freeJob структура Job сразу попадает в freelist, и другой поток может её
+    // выдать через allocateJob и перезаписать поля (в том числе counter). Тогда мы
+    // уменьшали бы чужой счётчик, а настоящий так и не дошёл бы до нуля (wait() завис бы).
+    // Поэтому всё, что нужно после освобождения, копируем в локальную переменную заранее.
+    std::atomic<int32_t>* counter = job->counter;
+
     freeJob(job);
 
-    if (job->counter)
+    // ИСПРАВЛЕНИЕ условия. fetch_sub возвращает ПРЕДЫДУЩЕЕ значение счётчика, а не новое.
+    // Значение 1 означает «до нашего вычитания оставался один job — мы закончили последний».
+    // Раньше стояло == 0, оно никогда не выполнялось, и notify_all не вызывался вообще.
+    if (counter && counter->fetch_sub(1) == 1)
     {
-        if (job->counter->fetch_sub(1) == 0)
-        {
-            m_cv.notify_all();
-        }
+        m_cv.notify_all();
     }
 }
