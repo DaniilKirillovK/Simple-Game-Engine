@@ -11,6 +11,9 @@
 
 #include "tracy/Tracy.hpp"
 
+#define PHYSICS_PARALLEL
+//#define EXTRA_PHYSICS_CALCULATIONS
+
 namespace 
 {
     struct GravityCtx
@@ -30,11 +33,13 @@ namespace
             rb.velocity += ctx->gravity * ctx->dt;
         }
 
+#ifdef EXTRA_PHYSICS_CALCULATIONS
         int counter = 0;
         for (int i = 0; i < 100000; ++i)
         {
             counter++;
         }
+#endif // EXTRA_PHYSICS_CALCULATIONS
     }
 
     struct IntegrateCtx
@@ -55,11 +60,13 @@ namespace
         e.transform->position += rb.velocity * ctx->dt;
         rb.acceleration = glm::vec3(0.0f);
 
+#ifdef EXTRA_PHYSICS_CALCULATIONS
         int counter = 0;
         for (int i = 0; i < 100000; ++i)
         {
             counter++;
         }
+#endif // EXTRA_PHYSICS_CALCULATIONS
     }
 
     struct BroadNarrowCtx
@@ -129,7 +136,7 @@ PhysicsSystem::PhysicsSystem(IRenderAdapter* renderer)
     });
 }
 
-void PhysicsSystem::update(World& world, JobSystem* jobs, float deltaTime)
+void PhysicsSystem::update(World& world, float deltaTime)
 {
     ZoneScopedN("PhysicsSystem::update");
 
@@ -149,25 +156,19 @@ void PhysicsSystem::update(World& world, JobSystem* jobs, float deltaTime)
     {
         ZoneScopedN("Physics::Step");
 
-        if (jobs)
-        {
-            applyGravityParallel(jobs, deltaTime);
-            updatePositionsParallel(jobs, deltaTime);
-        }
-        else
-        {
-            applyGravity(deltaTime);
-            updatePositions(deltaTime);
-        }
+#ifdef PHYSICS_PARALLEL
+        applyGravityParallel(deltaTime);
+        updatePositionsParallel(deltaTime);
+#else
+        applyGravity(deltaTime);
+        updatePositions(deltaTime);
+#endif // PHYSICS_PARALLEL
 
-        if (jobs)
-        {
-            detectAndResolveCollisionsParallel(jobs);
-        }
-        else
-        {
-            detectAndResolveCollisions();
-        }
+#ifdef PHYSICS_PARALLEL
+    detectAndResolveCollisionsParallel();
+#else
+    detectAndResolveCollisions();
+#endif // PHYSICS_PARALLEL
 
         m_accumulator -= m_fixedTimestep;
     }
@@ -218,11 +219,13 @@ void PhysicsSystem::applyGravity(float dt)
             rb.velocity += m_gravity * dt;
         }
 
+#ifdef EXTRA_PHYSICS_CALCULATIONS
         int counter = 0;
         for (int i = 0; i < 100000; ++i)
         {
             counter++;
         }
+#endif // EXTRA_PHYSICS_CALCULATIONS
     }
 }
 
@@ -239,11 +242,13 @@ void PhysicsSystem::updatePositions(float dt)
         e.transform->position += rb.velocity * dt;
         rb.acceleration = glm::vec3(0.0f);
 
+#ifdef EXTRA_PHYSICS_CALCULATIONS
         int counter = 0;
         for (int i = 0; i < 100000; ++i)
         {
             counter++;
         }
+#endif // EXTRA_PHYSICS_CALCULATIONS
     }
 }
 
@@ -276,14 +281,14 @@ void PhysicsSystem::detectAndResolveCollisions()
     }
 }
 
-void PhysicsSystem::detectAndResolveCollisionsParallel(JobSystem* jobs)
+void PhysicsSystem::detectAndResolveCollisionsParallel()
 {
     ZoneScopedN("Physics::DetectAndResolve (parallel)");
 
     const uint32_t N = static_cast<uint32_t>(m_entities.size());
     if (N < 2) return;
 
-    const uint32_t numJobs = std::max(1u, jobs->getNumWorkers());
+    const uint32_t numJobs = std::max(1u, JobSystem::get().getNumWorkers());
 
     if (m_contactBuffers.size() < numJobs)
         m_contactBuffers.resize(numJobs);
@@ -299,7 +304,7 @@ void PhysicsSystem::detectAndResolveCollisionsParallel(JobSystem* jobs)
     {
         ZoneScopedN("Physics::BroadNarrow (parallel)");
         MultiBroadNarrowCtx mc{ ctxs.data() };
-        jobs->parallelFor(numJobs, 1, broadNarrowMultiJob, &mc,
+        JobSystem::get().parallelFor(numJobs, 1, broadNarrowMultiJob, &mc,
             "Physics::BroadNarrow");
     }
 
@@ -317,7 +322,7 @@ void PhysicsSystem::detectAndResolveCollisionsParallel(JobSystem* jobs)
     }
 }
 
-void PhysicsSystem::applyGravityParallel(JobSystem* jobs, float dt)
+void PhysicsSystem::applyGravityParallel(float dt)
 {
     ZoneScopedN("Physics::Gravity (parallel)");
 
@@ -326,13 +331,13 @@ void PhysicsSystem::applyGravityParallel(JobSystem* jobs, float dt)
     GravityCtx ctx{ m_entities.data(), m_gravity, dt };
 
     const uint32_t count = static_cast<uint32_t>(m_entities.size());
-    const uint32_t batch = std::max(8u,
-        count / (jobs->getNumWorkers() * 4));
+    const uint32_t batch = std::max(64u,
+        count / (JobSystem::get().getNumWorkers() * 4));
 
-    jobs->parallelFor(count, batch, applyGravityJob, &ctx, "Physics::Gravity (parallel)");
+    JobSystem::get().parallelFor(count, batch, applyGravityJob, &ctx, "Physics::Gravity (parallel)");
 }
 
-void PhysicsSystem::updatePositionsParallel(JobSystem* jobs, float dt)
+void PhysicsSystem::updatePositionsParallel(float dt)
 {
     ZoneScopedN("Physics::Integrate (parallel)");
 
@@ -341,10 +346,10 @@ void PhysicsSystem::updatePositionsParallel(JobSystem* jobs, float dt)
     IntegrateCtx ctx{ m_entities.data(), dt };
 
     const uint32_t count = static_cast<uint32_t>(m_entities.size());
-    const uint32_t batch = std::max(8u,
-        count / (jobs->getNumWorkers() * 4));
+    const uint32_t batch = std::max(64u,
+        count / (JobSystem::get().getNumWorkers() * 4));
 
-    jobs->parallelFor(count, batch, integratePositionsJob, &ctx, "Physics::Integrate (parallel)");
+    JobSystem::get().parallelFor(count, batch, integratePositionsJob, &ctx, "Physics::Integrate (parallel)");
 }
 
 void PhysicsSystem::renderDebugColliders(World& world)

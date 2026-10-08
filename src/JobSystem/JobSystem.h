@@ -115,44 +115,79 @@ struct Job
     Job* next = nullptr;
 };
 
+enum class Priority : uint8_t
+{
+    High = 0,
+    Normal = 1,
+    Low = 2,
+    Count = 3
+};
+
 class JobSystem 
 {
 public:
-    explicit JobSystem(uint32_t numWorkers = 0);
-    ~JobSystem();
+    static void init(uint32_t numWorkers = 0)
+    {
+        s_instance = new JobSystem(numWorkers);
+        s_instance->registerMainThread();
+    }
+
+    static JobSystem& get()
+    {
+        if (!s_instance)
+        {
+            s_instance = new JobSystem(0);
+        }
+        return *s_instance;
+    }
+
+    static void shutdown()
+    {
+        delete s_instance;
+        s_instance = nullptr;
+    }
 
     JobSystem(const JobSystem&) = delete;
     JobSystem& operator=(const JobSystem&) = delete;
+    JobSystem(JobSystem&&) = delete;
+    JobSystem& operator=(JobSystem&&) = delete;
 
     void registerMainThread();
 
-    void execute(Function fn, void* data);
+    void execute(Function fn, void* data, Priority priority = Priority::Normal);
 
-    void parallelFor(uint32_t count, uint32_t batch, Function fn, void* data, const char* name = nullptr);
+    void parallelFor(uint32_t count, uint32_t batch, Function fn, void* data, const char* name = nullptr,
+        Priority priority = Priority::Normal);
 
     void parallelForAsync(uint32_t count, uint32_t batch,
-        Function fn, void* data, JobCounter* counter, const char* name = nullptr);
+        Function fn, void* data, JobCounter* counter, const char* name = nullptr,
+        Priority priority = Priority::Normal);
 
     void wait(JobCounter* counter);
 
     uint32_t getNumWorkers() const { return m_numWorkers; }
 
 private:
+    JobSystem(uint32_t numWorkers);
+    ~JobSystem();
+
     static constexpr uint32_t DEQUE_CAPACITY = 4096;
     static constexpr uint32_t POOL_CHUNK_SIZE = 4096;
 
     struct alignas(CACHE_LINE_SIZE) Worker 
     {
-        WorkStealingDeque<Job*, DEQUE_CAPACITY> m_deque;
+        WorkStealingDeque<Job*, DEQUE_CAPACITY> deques[static_cast<size_t>(Priority::Count)];
     };
 
     void workerLoop(uint32_t id);
     Job* allocateJob();
     void freeJob(Job* job);
-    void submit(Job* job);
-    bool tryPopJob(uint32_t id, Job*& out);
-    bool tryStealJob(uint32_t skipId, Job*& out);
+    void submit(Job* job, Priority priority);
+    bool tryPopJob(uint32_t id, Job*& out, Priority& outPriority);
+    bool tryStealJob(uint32_t skipId, Job*& out, Priority& outPriority);
     void executeJob(Job* job);
+
+    static inline JobSystem* s_instance = nullptr;
 
     static thread_local uint32_t m_tlsWorkerIndex;
 

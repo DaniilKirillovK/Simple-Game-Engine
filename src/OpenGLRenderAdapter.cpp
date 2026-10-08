@@ -15,7 +15,7 @@
 #include "Resources/ShaderLoader/ShaderProgram.h"
 #include "Resources/TextureLoader/Texture.h"
 #include "tracy/Tracy.hpp"
-#include "Resources/AssetLoader.h" // асинхронная загрузка: окно ассетов теперь запрашивает ресурсы через AssetLoader
+#include "Resources/AssetLoader.h"
 #include "Common/KeyCode.h"
 #include "libs/imgui/imgui.h"
 #include "libs/imgui/backends/imgui_impl_glfw.h"

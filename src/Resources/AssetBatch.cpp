@@ -47,9 +47,8 @@ AssetBatch::AssetBatch(JobSystem* jobs, IRenderAdapter* renderAdapter)
 void AssetBatch::requestMesh(const std::string& path)
 {
     if (path.empty()) return;
-    if (!m_requestedMeshes.insert(path).second) return; // already requested
+    if (!m_requestedMeshes.insert(path).second) return;
 
-    // Nothing to do if the resource manager already has it.
     if (RESOURCE_MANAGER.isLoaded<Mesh>(path)) return;
 
     m_meshPaths.push_back(path);
@@ -69,7 +68,6 @@ void AssetBatch::flush()
 {
     ZoneScopedN("AssetBatch::flush");
 
-    // Meshes: parallel decode, then register
     if (!m_meshPaths.empty())
     {
         ZoneScopedN("AssetBatch::Meshes");
@@ -81,8 +79,6 @@ void AssetBatch::flush()
 
         if (m_jobs && count > 1)
         {
-            // One asset per job: asset decoding is coarse-grained enough that
-            // per-batch splitting would only add imbalance.
             m_jobs->parallelFor(count, 1, loadMeshJob, &ctx);
         }
         else
@@ -105,7 +101,6 @@ void AssetBatch::flush()
                  " mesh(es) in parallel");
     }
 
-    //  Textures: parallel decode + serial GPU upload
     if (!m_texturePaths.empty())
     {
         ZoneScopedN("AssetBatch::Textures");
@@ -124,7 +119,6 @@ void AssetBatch::flush()
             for (uint32_t i = 0; i < count; ++i) loadTextureJob(&ctx, i);
         }
 
-        // The GPU upload must happen on the GL thread, so it stays serial.
         for (uint32_t i = 0; i < count; ++i)
         {
             if (!m_textureDataResults[i]) continue;

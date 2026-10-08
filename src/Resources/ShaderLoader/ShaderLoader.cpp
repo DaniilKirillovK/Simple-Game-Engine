@@ -10,12 +10,8 @@
 #include "OpenGLRenderAdapter.h"
 #include "tracy/Tracy.hpp"
 
-// СТАДИЯ 1 (CPU): чтение текста шейдера и определение типа по расширению (.vert / .frag).
-// Выделена из бывшей loadFromFile. GL здесь не вызывается, поэтому функция безопасна
-// для вызова из воркера.
 bool ShaderLoader::readSource(const std::string& shaderPath, ShaderSource& out)
 {
-    // TRACY: стадия 1 загрузки шейдера (чтение файла).
     ZoneScopedN("ShaderLoader::readSource");
     ZoneText(shaderPath.c_str(), shaderPath.size());
 
@@ -24,9 +20,6 @@ bool ShaderLoader::readSource(const std::string& shaderPath, ShaderSource& out)
     out.source = readFile(shaderPath);
     if (out.source.empty())
     {
-        // ИСПРАВЛЕНИЕ: раньше в сообщение подставлялась переменная с текстом шейдера
-        // (которая здесь как раз пустая), поэтому в логе не было видно, какой файл виноват.
-        // Теперь выводится путь.
         LOG_ERROR("ShaderLoader: shader is empty: " + shaderPath);
         return false;
     }
@@ -34,8 +27,6 @@ bool ShaderLoader::readSource(const std::string& shaderPath, ShaderSource& out)
     out.path = shaderPath;
     out.type = ShaderType::None;
 
-    // ИСПРАВЛЕНИЕ: раньше substr(length() - 4) вызывался без проверки длины; для пути короче
-    // 4 символов это выбрасывало исключение std::out_of_range.
     if (shaderPath.length() >= 4)
     {
         const std::string shaderTypeStr = shaderPath.substr(shaderPath.length() - 4);
@@ -52,16 +43,11 @@ bool ShaderLoader::readSource(const std::string& shaderPath, ShaderSource& out)
     return true;
 }
 
-// СТАДИЯ 2 (GPU): компиляция подготовленного текста шейдера. Выделена из бывшей
-// loadFromFile без изменения логики. Вызывает OpenGL, поэтому только в потоке с GL-контекстом.
 std::unique_ptr<Shader> ShaderLoader::createGPU(const ShaderSource& source)
 {
-    // TRACY: стадия 2 (компиляция шейдера в драйвере; шейдеры остаются синхронными, и эта
-    // зона показывает, сколько на самом деле стоит их загрузка).
     ZoneScopedN("ShaderLoader::createGPU");
     ZoneText(source.path.c_str(), source.path.size());
 
-    // Защита от вызова до registerLoader (раньше указатель был неинициализированным).
     if (!m_renderAdapter)
     {
         return nullptr;
@@ -84,8 +70,6 @@ std::unique_ptr<Shader> ShaderLoader::createGPU(const ShaderSource& source)
     return shader;
 }
 
-// Обе стадии подряд в одном потоке — прежнее поведение функции. Теперь это композиция
-// readSource + createGPU, внешний вид API для остального кода не изменился.
 std::unique_ptr<Shader> ShaderLoader::loadFromFile(const std::string& shaderPath)
 {
     ShaderSource source;

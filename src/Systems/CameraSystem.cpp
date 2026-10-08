@@ -7,7 +7,7 @@
 
 #include "tracy/Tracy.hpp"
 
-void CameraSystem::update(World& world, JobSystem* jobs, float deltaTime)
+void CameraSystem::update(World& world, float deltaTime)
 {
     ZoneScopedN("CameraSystem::update");
 

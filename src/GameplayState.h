@@ -12,7 +12,7 @@ public:
     GameplayState(IRenderAdapter& renderer);
 
     virtual void onEnter() override;
-    virtual void update(JobSystem* jobs, float deltaTime) override;
+    virtual void update(float deltaTime) override;
     virtual void render() override;
 
 private:

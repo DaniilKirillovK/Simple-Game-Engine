@@ -40,7 +40,7 @@ public:
 
     PhysicsSystem(IRenderAdapter* renderAdapter);
 
-    virtual void update(World& world, JobSystem* jobs, float deltaTime) override;
+    virtual void update(World& world, float deltaTime) override;
     virtual void setEnabled(bool isEnabled) override;
 
     static bool checkCollision(const Collider& a, const Transform& transformA,
@@ -62,13 +62,13 @@ private:
     void gatherEntities(World& world);
 
     void detectAndResolveCollisions();
-    void detectAndResolveCollisionsParallel(JobSystem*);
+    void detectAndResolveCollisionsParallel();
 
     void applyGravity(float dt);
-    void applyGravityParallel(JobSystem* jobs, float dt);
+    void applyGravityParallel(float dt);
 
     void updatePositions(float dt);
-    void updatePositionsParallel(JobSystem* jobs, float dt);
+    void updatePositionsParallel(float dt);
 
     void renderDebugColliders(World& world);
 

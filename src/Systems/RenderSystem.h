@@ -7,7 +7,7 @@ class RenderSystem : public ISystem
 {
 public:
 	RenderSystem(IRenderAdapter* renderAdapter);
-	virtual void update(World& world, JobSystem* jobs, float deltaTime) override;
+	virtual void update(World& world, float deltaTime) override;
 	virtual void setEnabled(bool isEnabled) override;
 
 private:

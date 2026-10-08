@@ -26,8 +26,6 @@ GameplayState::GameplayState(IRenderAdapter& renderer)
 
 void GameplayState::onEnter()
 {
-    // TRACY: вход в состояние включает загрузку тестовой сцены (setupTestScene), то есть
-    // самую тяжёлую часть старта. Зона вне кадра (до первого FrameMark), в Tracy видна на таймлайне.
     ZoneScopedN("GameplayState::onEnter");
 
     m_world = new World();
@@ -43,11 +41,11 @@ void GameplayState::onEnter()
 	LOG_INFO("Enter Gameplay State");
 }
 
-void GameplayState::update(JobSystem* jobs, float deltaTime)
+void GameplayState::update(float deltaTime)
 {
     ZoneScoped;
 
-    m_world->update(jobs, deltaTime);
+    m_world->update(deltaTime);
 }
 
 void GameplayState::render()
@@ -147,7 +145,7 @@ void GameplayState::createEmptyEntity()
     m_world->getComponentPool<Transform>().addComponent(newEntity, Transform{});
     m_world->getComponentPool<Tag>().addComponent(newEntity, Tag{ "Empty" });
     m_renderer.setSelectedEntity(newEntity);
-    LOG_INFO("Created empty entity: %d", newEntity);
+    LOG_INFO("Created empty entity: " + std::to_string(newEntity));
 }
 
 void GameplayState::createCubeEntity()

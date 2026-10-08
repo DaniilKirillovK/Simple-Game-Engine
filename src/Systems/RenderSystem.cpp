@@ -16,7 +16,7 @@ RenderSystem::RenderSystem(IRenderAdapter* renderAdapter)
 {
 }
 
-void RenderSystem::update(World& world, JobSystem* jobs, float deltaTime)
+void RenderSystem::update(World& world, float deltaTime)
 {
     ZoneScopedN("RenderSystem::update");
 

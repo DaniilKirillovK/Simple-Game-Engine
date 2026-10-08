@@ -11,14 +11,12 @@
 #include <mutex>
 #include <vector>
 #include <utility>
-#include "tracy/Tracy.hpp" // зона синхронной загрузки в load()
+#include "tracy/Tracy.hpp"
 
 // Cache type: map<path, shared_ptr<Resource<T>>>
 template<typename T>
 using ResourceCache = std::unordered_map<std::string, std::shared_ptr<Resource<T>>>;
 
-// Тип функции-загрузчика (вынесен в отдельный псевдоним, чтобы копировать загрузчик
-// из списка и вызывать его уже вне мьютекса). Список загрузчиков: пары (приоритет, функция).
 template<typename T>
 using LoaderFunc = std::function<std::unique_ptr<T>(const std::string&)>;
 
@@ -26,13 +24,6 @@ template<typename T>
 using LoaderList = std::vector<std::pair<int, LoaderFunc<T>>>;
 
 
-// ПОТОКОБЕЗОПАСНОСТЬ (добавлено в рамках подготовки к параллельной загрузке).
-// Раньше кэши лежали в обычных unordered_map без какой-либо защиты: одновременный доступ
-// из двух потоков привёл бы к гонке. Теперь каждый публичный метод берёт m_mutex, поэтому
-// менеджером можно пользоваться и из главного потока, и из воркеров job system.
-// Принцип: загрузчик (loader) вызывается ВСЕГДА БЕЗ удержания мьютекса — загрузка может
-// быть долгой, и пока один поток грузит файл, остальные не должны стоять на блокировке.
-// Результат публикуется в кэш уже под мьютексом.
 class ResourceManager
 {
 public:
@@ -42,15 +33,9 @@ public:
         return instance;
     }
 
-    // Возвращает ресурс из кэша либо загружает его СИНХРОННО через зарегистрированный загрузчик
-    // (блокирует вызывающий поток). Асинхронный путь — через AssetLoader.
     template<typename T>
     std::shared_ptr<Resource<T>> load(const std::string& path);
 
-    // НОВЫЙ метод. Кладёт уже готовые данные в кэш под ключом path (без вызова загрузчика).
-    // Нужен AssetLoader: он создаёт заглушку и регистрирует её в менеджере. Если путь уже
-    // есть в кэше, побеждает существующий ресурс, а переданные data отбрасываются
-    // (так два запроса одного пути не создадут два разных объекта).
     template<typename T>
     std::shared_ptr<Resource<T>> insert(const std::string& path, std::unique_ptr<T> data);
 
@@ -83,17 +68,12 @@ private:
     ResourceManager() = default;
     ~ResourceManager() = default;
 
-    // Внутренние функции доступа к картам. Сами НЕ блокируют: вызывающий обязан уже держать
-    // m_mutex. (Блокировка внутри привела бы к дедлоку при повторном захвате того же мьютекса.)
     template<typename T>
     ResourceCache<T>& getCache();
 
     template<typename T>
     LoaderList<T>& getLoaders();
 
-    // Один мьютекс на все кэши и список загрузчиков. mutable — чтобы можно было брать его
-    // в const-методе getCacheSize. (Раньше код обращался к переменной «mutex», которой в
-    // классе не существовало; это не ломало сборку лишь потому, что шаблоны не инстанцировались.)
     mutable std::mutex m_mutex;
     std::unordered_map<std::type_index, std::any> caches;
     std::unordered_map<std::type_index, std::any> loaders;
@@ -102,8 +82,6 @@ private:
 template<typename T>
 std::shared_ptr<Resource<T>> ResourceManager::load(const std::string& path)
 {
-    // ЭТАП 1 (под мьютексом): проверка кэша и выбор загрузчика.
-    // Загрузчик копируем в локальную переменную, чтобы вызвать его уже без блокировки.
     LoaderFunc<T> loader;
 
     {
@@ -130,17 +108,11 @@ std::shared_ptr<Resource<T>> ResourceManager::load(const std::string& path)
         loader = registered.front().second;
     }
 
-    // TRACY: зона СИНХРОННОЙ загрузки. Стоит после проверки кэша, поэтому появляется только
-    // при реальной загрузке (промах кэша), а не на каждом обращении. Длинная зона на строке
-    // главного потока = фриз кадра. Именно её нужно показать на трейсе «до» и убедиться,
-    // что после перехода на AssetLoader она исчезает из горячих мест (сцена, окно ассетов).
     ZoneScopedN("ResourceManager::load (sync)");
     ZoneText(path.c_str(), path.size());
 
     LOG_RESOURCEMANAGER(std::string("Loading: ") + path);
 
-    // ЭТАП 2 (БЕЗ мьютекса): сама загрузка. Она может занять десятки миллисекунд, и в это
-    // время другие потоки должны иметь возможность работать с менеджером.
     std::unique_ptr<T> data = loader(path);
     if (!data)
     {
@@ -148,8 +120,6 @@ std::shared_ptr<Resource<T>> ResourceManager::load(const std::string& path)
         return nullptr;
     }
 
-    // ЭТАП 3 (под мьютексом внутри insert): публикация в кэш. Если за время загрузки другой
-    // поток успел положить тот же путь, insert вернёт уже существующий ресурс.
     return insert<T>(path, std::move(data));
 }
 
@@ -163,7 +133,6 @@ std::shared_ptr<Resource<T>> ResourceManager::insert(const std::string& path, st
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    // Путь уже занят — возвращаем существующий ресурс, новые данные отбрасываются.
     auto& cache = getCache<T>();
     auto it = cache.find(path);
     if (it != cache.end() && it->second)
@@ -180,8 +149,6 @@ std::shared_ptr<Resource<T>> ResourceManager::insert(const std::string& path, st
 template<typename T>
 void ResourceManager::registerLoader(LoaderFunc<T> loader, int priority)
 {
-    // Мьютекс держим только на изменение списка загрузчиков; лог пишем уже после выхода из
-    // блока (лог тоже под мьютексом, и держать два мьютекса сразу без нужды не стоит).
     {
         std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -227,7 +194,6 @@ bool ResourceManager::isLoaded(const std::string& path)
 template<typename T>
 void ResourceManager::unload(const std::string& path)
 {
-    // Флаг нужен, чтобы записать в лог уже ПОСЛЕ освобождения мьютекса (см. registerLoader).
     bool erased = false;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -267,9 +233,8 @@ ResourceCache<T>& ResourceManager::getCache()
 {
     std::type_index typeIdx = std::type_index(typeid(T));
     auto it = caches.find(typeIdx);
-    if (it == caches.end()) {
-        // Раньше здесь был двойной поиск (caches[typeIdx] дважды); теперь один emplace, и
-        // итератор переиспользуется для any_cast ниже.
+    if (it == caches.end()) 
+    {
         it = caches.emplace(typeIdx, ResourceCache<T>()).first;
     }
     return std::any_cast<ResourceCache<T>&>(it->second);

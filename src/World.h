@@ -30,7 +30,7 @@ public:
 	float getCurrentDeltaTime() { return m_currentDeltaTime; }
 
 	void addSystem(std::unique_ptr<ISystem> system);
-	void update(JobSystem* jobs, float deltaTime);
+	void update(float deltaTime);
 
 	void clear();
 
@@ -104,12 +104,12 @@ inline void World::addSystem(std::unique_ptr<ISystem> system)
 	systems.push_back(std::move(system));
 }
 
-inline void World::update(JobSystem* jobs, float deltaTime)
+inline void World::update(float deltaTime)
 {
 	m_currentDeltaTime = deltaTime;
 	for (std::unique_ptr<ISystem>& system : systems)
 	{
-		system->update(*this, jobs, deltaTime);
+		system->update(*this, deltaTime);
 	}
 }
 

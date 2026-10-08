@@ -48,7 +48,7 @@ void JobSystem::registerMainThread()
     m_tlsWorkerIndex = m_numWorkers;
 }
 
-void JobSystem::execute(Function fn, void* data)
+void JobSystem::execute(Function fn, void* data, Priority priority)
 {
     Job* job = allocateJob();
     job->fn = fn;
@@ -56,13 +56,11 @@ void JobSystem::execute(Function fn, void* data)
     job->start = 0;
     job->end = 1;
     job->counter = nullptr;
-    // Структуры Job переиспользуются из пула, и поля не обнуляются при возврате. Если не
-    // сбросить name здесь, в Tracy у этого job-а появилось бы имя от прошлого владельца структуры.
     job->name = nullptr;
-    submit(job);
+    submit(job, priority);
 }
 
-void JobSystem::parallelFor(uint32_t count, uint32_t batch, Function fn, void* data, const char* name)
+void JobSystem::parallelFor(uint32_t count, uint32_t batch, Function fn, void* data, const char* name, Priority priority)
 {
     if (count == 0) return;
     if (batch == 0) batch = 1;
@@ -83,13 +81,13 @@ void JobSystem::parallelFor(uint32_t count, uint32_t batch, Function fn, void* d
         job->end = end;
         job->counter = &counter.m_count;
         job->name = name;
-        submit(job);
+        submit(job, priority);
     }
 
     wait(&counter);
 }
 
-void JobSystem::parallelForAsync(uint32_t count, uint32_t batch, Function fn, void* data, JobCounter* counter, const char* name)
+void JobSystem::parallelForAsync(uint32_t count, uint32_t batch, Function fn, void* data, JobCounter* counter, const char* name, Priority priority)
 {
     if (count == 0) 
     {
@@ -113,7 +111,7 @@ void JobSystem::parallelForAsync(uint32_t count, uint32_t batch, Function fn, vo
         job->end = end;
         job->counter = &counter->m_count;
         job->name = name;
-        submit(job);
+        submit(job, priority);
     }
 }
 
@@ -126,28 +124,21 @@ void JobSystem::wait(JobCounter* counter)
     while (counter->m_count.load() > 0) 
     {
         Job* job = nullptr;
+        Priority prio = Priority::Normal;
         bool didWork = false;
 
         // Own deque first — our children are usually here.
-        if (myIdx != UINT32_MAX && tryPopJob(myIdx, job)) 
+        if (myIdx != UINT32_MAX && tryPopJob(myIdx, job, prio)) 
         {
             executeJob(job);
             didWork = true;
         }
 
         // Then steal from others.
-        if (!didWork) 
+        if (!didWork && tryStealJob(myIdx, job, prio))
         {
-            for (uint32_t i = 0; i < m_totalSlots; ++i)
-            {
-                if (i == myIdx) continue;
-                if (m_workers[i]->m_deque.steal(job))
-                {
-                    executeJob(job);
-                    didWork = true;
-                    break;
-                }
-            }
+            executeJob(job);
+            didWork = true;
         }
 
         if (!didWork)
@@ -168,10 +159,10 @@ void JobSystem::workerLoop(uint32_t id)
     while (!m_stop.load()) 
     {
         Job* job = nullptr;
+        Priority prio;
 
         {
-            // 1. Try our own deque
-            if (tryPopJob(id, job))
+            if (tryPopJob(id, job, prio))
             {
                 ZoneScopedN("Worker::PopLocal");
                 executeJob(job);
@@ -180,8 +171,7 @@ void JobSystem::workerLoop(uint32_t id)
         }
 
         {
-            // 2. Try to steal from someone else.
-            if (tryStealJob(id, job))
+            if (tryStealJob(id, job, prio))
             {
                 ZoneScopedN("Worker::Steal");
                 executeJob(job);
@@ -194,10 +184,11 @@ void JobSystem::workerLoop(uint32_t id)
             // 3. Nothing to do — wait briefly.
             std::unique_lock<std::mutex> lock(m_cvMutex);
             m_cv.wait_for(lock, std::chrono::microseconds(100), [this, id] {
-                return m_stop.load() ||
-                    !m_workers[id]->m_deque.empty();
-                }
-            );
+                if (m_stop.load()) return true;
+                for (auto& dq : m_workers[id]->deques)
+                    if (!dq.empty()) return true;
+                return false;
+                });
         }
     }
 }
@@ -228,44 +219,53 @@ void JobSystem::freeJob(Job* job)
     m_freeList = job;
 }
 
-void JobSystem::submit(Job* job)
+void JobSystem::submit(Job* job, Priority priority)
 {
     uint32_t idx = m_tlsWorkerIndex;
-    if (idx == UINT32_MAX)
-    {
-        idx = m_numWorkers;
-    }
+    if (idx == UINT32_MAX) idx = m_numWorkers;
 
     Worker& w = *m_workers[idx];
-    while (!w.m_deque.push(job))
+    auto& dq = w.deques[static_cast<size_t>(priority)];
+
+    while (!dq.push(job)) 
     {
         Job* temp = nullptr;
-        if (w.m_deque.pop(temp))
-        {
-            executeJob(temp);
-        }
-        else 
-        {
-            std::this_thread::yield();
-        }
+        if (dq.pop(temp)) executeJob(temp);
+        else std::this_thread::yield();
     }
 
     m_cv.notify_all();
 }
 
-bool JobSystem::tryPopJob(uint32_t id, Job*& out)
+bool JobSystem::tryPopJob(uint32_t id, Job*& out, Priority& outPriority)
 {
-    return m_workers[id]->m_deque.pop(out);
+    Worker& w = *m_workers[id];
+
+    for (uint8_t p = 0; p < static_cast<uint8_t>(Priority::Count); ++p)
+    {
+        if (w.deques[p].pop(out))
+        {
+            outPriority = static_cast<Priority>(p);
+            return true;
+        }
+    }
+    return false;
 }
 
-bool JobSystem::tryStealJob(uint32_t skipId, Job*& out)
+bool JobSystem::tryStealJob(uint32_t skipId, Job*& out, Priority& outPriority)
 {
-    for (uint32_t i = 1; i <= m_totalSlots; ++i)
+    for (uint8_t p = 0; p < static_cast<uint8_t>(Priority::Count); ++p)
     {
-        uint32_t victim = (skipId + i) % m_totalSlots;
-        if (m_workers[victim]->m_deque.steal(out))
+        for (uint32_t i = 1; i <= m_totalSlots; ++i)
         {
-            return true;
+            uint32_t victim = (skipId + i) % m_totalSlots;
+            if (victim == skipId) continue;
+
+            if (m_workers[victim]->deques[p].steal(out))
+            {
+                outPriority = static_cast<Priority>(p);
+                return true;
+            }
         }
     }
     return false;
@@ -287,18 +287,10 @@ void JobSystem::executeJob(Job* job)
         job->fn(job->data, i);
     }
 
-    // ИСПРАВЛЕНИЕ гонки (use-after-free). Раньше freeJob(job) вызывался ДО чтения job->counter.
-    // Но после freeJob структура Job сразу попадает в freelist, и другой поток может её
-    // выдать через allocateJob и перезаписать поля (в том числе counter). Тогда мы
-    // уменьшали бы чужой счётчик, а настоящий так и не дошёл бы до нуля (wait() завис бы).
-    // Поэтому всё, что нужно после освобождения, копируем в локальную переменную заранее.
     std::atomic<int32_t>* counter = job->counter;
 
     freeJob(job);
 
-    // ИСПРАВЛЕНИЕ условия. fetch_sub возвращает ПРЕДЫДУЩЕЕ значение счётчика, а не новое.
-    // Значение 1 означает «до нашего вычитания оставался один job — мы закончили последний».
-    // Раньше стояло == 0, оно никогда не выполнялось, и notify_all не вызывался вообще.
     if (counter && counter->fetch_sub(1) == 1)
     {
         m_cv.notify_all();

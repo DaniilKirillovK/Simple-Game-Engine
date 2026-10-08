@@ -1,4 +1,5 @@
 #include "Utils/Assets/AssetsUtils.h"
+#include <algorithm>
 #include <filesystem>
 
 void AssetsUtils::scanAssetsDirectory(const std::string& directory, std::string& currentDirectory, std::vector<AssetInfo>& currentDirectoryContent)

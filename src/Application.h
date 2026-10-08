@@ -19,8 +19,6 @@ public:
     void run();
     void shutdown();
 
-    JobSystem* jobs() { return m_jobs; }
-
 private:
     void bindActions();
     void handleEvents();
@@ -28,7 +26,6 @@ private:
     void render();
     void changeState(std::unique_ptr<IGameState> newState);
 
-    JobSystem* m_jobs;
     std::unique_ptr<IRenderAdapter> renderer;
     std::unique_ptr<IGameState> currentState;
     bool running = false;

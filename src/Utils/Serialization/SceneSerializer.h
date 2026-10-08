@@ -12,7 +12,7 @@
 #include "IRenderAdapter.h"
 #include <string>
 
-
+class JobSystem;
 
 class SceneSerializer 
 {
@@ -22,7 +22,6 @@ public:
     static nlohmann::json serializeWorld(World& world);
     static void deserializeWorld(IRenderAdapter& renderAdapter, World& world, const nlohmann::json& j);
 
-private:
     static nlohmann::json serializeTransform(const Transform& transform);
     static nlohmann::json serializeTag(const Tag& tag);
     static nlohmann::json serializeLight(const Light& light);
@@ -41,5 +40,6 @@ private:
     static void deserializeHierarchy(Hierarchy& hierarchy, const nlohmann::json& j);
     static void deserializeCamera(Camera& camera, const nlohmann::json& j);
 
+private:
     static Mesh* createPrimitiveMesh(const nlohmann::json& meshJson);
 };

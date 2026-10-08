@@ -5,7 +5,7 @@
 
 #include "tracy/Tracy.hpp"
 
-void MovementSystem::update(World& world, JobSystem* jobs, float deltaTime)
+void MovementSystem::update(World& world, float deltaTime)
 {
     ZoneScopedN("MovementSystem::update");
 
