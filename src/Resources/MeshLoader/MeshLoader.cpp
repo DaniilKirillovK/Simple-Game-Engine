@@ -146,8 +146,6 @@ std::string MeshLoader::extractDirectory(const std::string& filepath)
 
 std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
 {
-    // TRACY: полная загрузка меша (Assimp + сборка вершин/индексов, весь этот код — CPU).
-    // Как и у текстур, зона одна и для синхронного пути, и для воркера.
     ZoneScopedN("MeshLoader::loadMesh");
     ZoneText(filepath.c_str(), filepath.size());
 
@@ -161,7 +159,6 @@ std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
         return nullptr;
     }
 
-    // Single mesh or multiple meshes loading
     unsigned int meshCount = scene->mNumMeshes;
     if (meshCount == 0)
     {
@@ -184,7 +181,6 @@ std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
             return nullptr;
         }
 
-        // All meshes into one mesh
         auto mergedMesh = std::make_unique<Mesh>();
         mergedMesh->type = MeshType::Custom;
 
@@ -196,7 +192,6 @@ std::unique_ptr<Mesh> MeshLoader::loadMesh(const std::string& filepath)
             mergedMesh->normals.insert(mergedMesh->normals.end(), mesh->normals.begin(), mesh->normals.end());
             mergedMesh->texCoords.insert(mergedMesh->texCoords.end(), mesh->texCoords.begin(), mesh->texCoords.end());
 
-            // Indicies with offset
             for (unsigned int idx : mesh->indices)
             {
                 mergedMesh->indices.push_back(idx + vertexOffset);

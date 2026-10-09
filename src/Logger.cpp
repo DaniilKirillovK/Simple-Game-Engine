@@ -18,11 +18,6 @@ void Logger::log(LogLevel level, const std::string& message, int detailsLevel)
 {
     if (LOG_DETAILS_LEVEL >= detailsLevel)
     {
-        // ИЗМЕНЕНИЕ для многопоточности. Раньше здесь были ручные mtx.lock() / mtx.unlock().
-        // Теперь блокировка через RAII (lock_guard): мьютекс гарантированно освобождается при
-        // выходе из блока, даже если внутри (например, в g_logCallback) вылетит исключение.
-        // Лог вызывается из воркеров (декодирование ассетов пишет в лог), поэтому весь вывод
-        // (консоль, файл и callback в рендерер) выполняется под одним мьютексом и не перемешивается.
         std::lock_guard<std::mutex> lock(mtx);
 
         std::string levelStr;
@@ -85,9 +80,6 @@ void Logger::setLogFile(const std::string& filename)
 
 void Logger::setLogCallback(std::function<void(LogLevel, const std::string&)> callback)
 {
-    // g_logCallback читается внутри Logger::log под тем же мьютексом, поэтому и запись
-    // (смена callback) должна быть под ним: иначе std::function могла бы читаться
-    // в момент перезаписи из другого потока.
     std::lock_guard<std::mutex> lock(mtx);
     g_logCallback = callback;
 }

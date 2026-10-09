@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <mutex> // для m_logMutex (потокобезопасный буфер логов)
+#include <mutex>
 #include <glm/glm.hpp>
 #include "libs/imgui/imgui.h"
 #include "Entity.h"
@@ -158,7 +158,7 @@ private:
     void saveCurrentScene();
     void loadLastScene();
     void setAutoSaveEnabled(bool enabled) { m_autoSaveEnabled = enabled; }
-    std::string m_currentScenePath = "assets/scenes/test_scene.json";
+    std::string m_currentScenePath = "assets\\scenes\\test_scene.json";
     bool m_autoSaveEnabled = true;
 
     // Asset Browser
@@ -227,9 +227,6 @@ private:
 
     // Log
     std::vector<LogEntry> m_logEntries;
-    // Защищает m_logEntries. LOG_* вызывается из воркеров job system, и callback логгера
-    // добавляет запись в этот вектор, пока главный поток в это же время рисует панель логов
-    // через ImGui. Без мьютекса это гонка данных (вектор мог бы перевыделиться во время обхода).
     std::mutex m_logMutex;
     int m_maxLogEntries = 2000;
     bool m_autoScrollLogs = true;

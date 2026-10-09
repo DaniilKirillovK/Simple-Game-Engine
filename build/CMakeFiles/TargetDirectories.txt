@@ -1,0 +1,3 @@
+C:/Users/MSI SWORD 15/Desktop/localReps/Simple-Game-Engine/build/CMakeFiles/GameEngine.dir
+C:/Users/MSI SWORD 15/Desktop/localReps/Simple-Game-Engine/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/MSI SWORD 15/Desktop/localReps/Simple-Game-Engine/build/CMakeFiles/ZERO_CHECK.dir

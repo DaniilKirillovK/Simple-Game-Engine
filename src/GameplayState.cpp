@@ -109,7 +109,7 @@ void GameplayState::exitPlayMode()
 
 void GameplayState::setupTestScene()
 {
-    std::string scenePath = "assets/scenes/test_scene.json";
+    std::string scenePath = "assets\\scenes\\test_scene.json";
 
     if (std::filesystem::exists(scenePath)) 
     {
@@ -124,7 +124,7 @@ void GameplayState::setupTestScene()
 
 void GameplayState::saveSceneState()
 {
-    m_savedScenePath = "assets/scenes/temp_save.json";
+    m_savedScenePath = "assets\\scenes\\temp_save.json";
     SceneSerializer::saveScene(*m_world, m_savedScenePath);
     LOG_INFO("Scene state saved");
 }

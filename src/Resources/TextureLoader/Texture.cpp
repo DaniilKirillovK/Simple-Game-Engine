@@ -1,11 +1,7 @@
 #include "Texture.h"
 #include <glad/glad.h>
-#include <libs/stb_image/stb_image.h> // здесь нужны только объявления (stbi_image_free); реализация stb подключена в TextureLoader.cpp
+#include <libs/stb_image/stb_image.h>
 
-// Освобождение пикселей. Память выделена внутри stbi_load, поэтому и освобождать её нужно
-// функцией stbi_image_free (раньше было delete[] — несовпадение аллокатора, неопределённое
-// поведение). Важно для многопоточности: данные декодируются в воркере, а освобождаются
-// в другом потоке, и ошибка в типе освобождения проявлялась бы случайно.
 void TextureData::cleanup()
 {
 	if (pixels)

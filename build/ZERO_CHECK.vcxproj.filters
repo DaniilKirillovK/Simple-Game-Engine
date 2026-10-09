@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\build\CMakeFiles\a027cd99d102ac3f025c2b3610977d0c\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{255F88EF-E991-33F6-AD96-E94F299754E1}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

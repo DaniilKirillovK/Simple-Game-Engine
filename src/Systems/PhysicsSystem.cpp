@@ -165,7 +165,10 @@ void PhysicsSystem::update(World& world, float deltaTime)
 #endif // PHYSICS_PARALLEL
 
 #ifdef PHYSICS_PARALLEL
-    detectAndResolveCollisionsParallel();
+        {
+            ZoneScopedN("PhysicsSystem::detectAndResolveCollisionsParallel");
+            detectAndResolveCollisionsParallel();
+        }
 #else
     detectAndResolveCollisions();
 #endif // PHYSICS_PARALLEL

@@ -1,7 +1,4 @@
-﻿// GameEngine.cpp: определяет точку входа для приложения.
-//
-
-#include "GameEngine.h"
+﻿#include "GameEngine.h"
 #include "src/Application.h"
 #include <filesystem>
 

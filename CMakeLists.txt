@@ -29,6 +29,7 @@ set(ASSIMP_LIB_NAME "assimp-vc143-mt")
 add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} ${IMGUIZMO_DIR} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp" "src/Utils/HierarchyUtils.cpp" "src/Utils/json.hpp" "src/Systems/TransformSystem.cpp" "src/Utils/Serialization/SceneSerializer.cpp" "src/Utils/Assets/AssetsUtils.cpp" "external/tracy/TracyClient.cpp" "src/JobSystem/JobSystem.cpp" "src/Resources/AssetLoader.cpp")
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE TRACY_ENABLE)
+add_compile_definitions(TRACY_ON_DEMAND)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}
@@ -80,9 +81,20 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMENT "Copying Assimp DLL to output directory"
 )
 
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/imgui.ini"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/imgui.ini"
+    COMMENT "Copying imgui.ini to output directory"
+)
+
 add_compile_definitions(
     IMGUI_DISABLE_OBSOLETE_KEYIO=0
     IMGUI_HAS_VIEWPORT=1
 )
 
 configure_file(${CMAKE_SOURCE_DIR}/imgui.ini ${CMAKE_BINARY_DIR}/imgui.ini COPYONLY)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+)

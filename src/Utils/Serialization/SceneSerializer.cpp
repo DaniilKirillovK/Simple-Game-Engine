@@ -5,20 +5,19 @@
 #include <set>
 #include "Components/Material.h"
 #include "Resources/ResourceManager.h"
-#include "Resources/AssetLoader.h" // асинхронные запросы мешей и текстур при загрузке сцены
+#include "Resources/AssetLoader.h"
 #include "MeshFactory.h"
 #include "tracy/Tracy.hpp"
-
 
 bool SceneSerializer::saveScene(World& world, const std::string& filepath)
 {
     try 
     {
         nlohmann::json j = serializeWorld(world);
-        std::ofstream file("../../../" + filepath);
-        if (!file.is_open()) 
+        std::ofstream file(filepath);
+        if (!file.is_open())
         {
-            LOG_ERROR("Failed to open file for writing: " + filepath);
+            LOG_ERROR("Failed to open file for reading: " + filepath);
             return false;
         }
 
@@ -42,8 +41,8 @@ bool SceneSerializer::loadScene(IRenderAdapter& renderAdapter, World& world, con
 
     try
     {
-        std::ifstream file("../../../" + filepath);
-        if (!file.is_open()) 
+        std::ifstream file(filepath);
+        if (!file.is_open())
         {
             LOG_ERROR("Failed to open file for reading: " + filepath);
             return false;
@@ -499,7 +498,6 @@ void SceneSerializer::deserializeLight(Light& light, const nlohmann::json& j)
         else if (typeStr == "spot") light.type = LightType::Spot;
     }
 
-    // Общие свойства
     if (j.contains("color")) 
     {
         light.color = glm::vec3(j["color"][0], j["color"][1], j["color"][2]);
