@@ -78,17 +78,18 @@ nlohmann::json SceneSerializer::serializeWorld(World& world)
     auto& cPool = world.getComponentPool<Collider>();
     auto& hPool = world.getComponentPool<Hierarchy>();
     auto& camPool = world.getComponentPool<Camera>();
+    auto& sPool = world.getComponentPool<Script>();
 
     std::vector<EntityId> allEntities;
     allEntities.reserve(
         tPool.size() + tagPool.size() + lPool.size() + mrPool.size() +
-        rbPool.size() + cPool.size() + hPool.size() + camPool.size());
+        rbPool.size() + cPool.size() + hPool.size() + camPool.size() + sPool.size());
     auto append = [&](auto& pool) {
         for (EntityId e : pool.entities())
             allEntities.push_back(e);
         };
     append(tPool); append(tagPool); append(lPool); append(mrPool);
-    append(rbPool); append(cPool); append(hPool); append(camPool);
+    append(rbPool); append(cPool); append(hPool); append(camPool); append(sPool);
 
     std::sort(allEntities.begin(), allEntities.end());
     allEntities.erase(std::unique(allEntities.begin(), allEntities.end()),
@@ -134,6 +135,10 @@ nlohmann::json SceneSerializer::serializeWorld(World& world)
         {
             ej["camera"] = serializeCamera(*t);
         }
+        if (auto* t = sPool.getComponent(e))
+        {
+            ej["script"] = serializeScript(*t);
+        }
 
         entitiesJson.push_back(std::move(ej));
     }
@@ -157,6 +162,7 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         const nlohmann::json* collider = nullptr;
         const nlohmann::json* hierarchy = nullptr;
         const nlohmann::json* camera = nullptr;
+        const nlohmann::json* script = nullptr;
     };
 
     const auto& entitiesArray = j["entities"];
@@ -182,6 +188,7 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         if (entityJson.contains("collider"))      d.collider = &entityJson["collider"];
         if (entityJson.contains("hierarchy"))     d.hierarchy = &entityJson["hierarchy"];
         if (entityJson.contains("camera"))        d.camera = &entityJson["camera"];
+        if (entityJson.contains("script"))        d.script = &entityJson["script"];
 
         entitiesData.push_back(d);
     }
@@ -194,6 +201,7 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
     auto& cPool = world.getComponentPool<Collider>();
     auto& hPool = world.getComponentPool<Hierarchy>();
     auto& camPool = world.getComponentPool<Camera>();
+    auto& sPool = world.getComponentPool<Script>();
 
     for (const auto& d : entitiesData)
     {
@@ -253,6 +261,13 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
             Camera* c = camPool.getComponent(newId);
             if (!c) { camPool.addComponent(newId, Camera{}); c = camPool.getComponent(newId); }
             deserializeCamera(*c, *d.camera);
+        }
+
+        if (d.script)
+        {
+            Script s;
+            deserializeScript(s, *d.script);
+            sPool.addComponent(newId, s);
         }
     }
 
@@ -723,4 +738,18 @@ Mesh* SceneSerializer::createPrimitiveMesh(const nlohmann::json& meshJson)
     }
 
     return MeshFactory::createCube();
+}
+
+nlohmann::json SceneSerializer::serializeScript(const Script& script)
+{
+	nlohmann::json j;
+	j["module"] = script.moduleName;
+	j["class"] = script.className;
+	return j;
+}
+
+void SceneSerializer::deserializeScript(Script& script, const nlohmann::json& j)
+{
+	script.moduleName = j.value("module", "");
+	script.className = j.value("class", "");
 }

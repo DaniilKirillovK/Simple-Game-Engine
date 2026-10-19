@@ -12,6 +12,7 @@ public:
     GameplayState(IRenderAdapter& renderer);
 
     virtual void onEnter() override;
+    virtual void onExit() override;
     virtual void update(float deltaTime) override;
     virtual void render() override;
 
@@ -31,8 +32,10 @@ private:
     void createSphereEntity();
     void createFromAsset(Mesh* mesh, const std::string& path);
 
-    void createMeshEntity(Mesh* mesh, const std::string& tagName,
+    EntityId createMeshEntity(Mesh* mesh, const std::string& tagName,
         const glm::vec4& color, bool withPhysics);
+
+    EntityId spawnPrimitive(const std::string& primitive, const glm::vec3& position);
 
     std::string m_savedScenePath;
 

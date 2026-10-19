@@ -1201,6 +1201,10 @@
                 "render_layer": 0,
                 "visible": true
             },
+            "script": {
+                "class": "Rotator",
+                "module": "rotator"
+            },
             "tag": {
                 "name": "donut"
             },

@@ -6,6 +6,7 @@
 #include "Resources/MeshLoader/MeshLoader.h"
 #include "Resources/TextureLoader/TextureLoader.h"
 #include "Resources/ShaderLoader/ShaderLoader.h"
+#include "Scripting/ScriptEngine.h"
 #include "tracy/Tracy.hpp"
 
 Application::Application()
@@ -15,6 +16,13 @@ Application::Application()
 
 Application::~Application()
 {
+    if (currentState)
+    {
+        currentState->onExit();
+        currentState.reset();
+    }
+    ScriptEngine::getInstance().shutdown();
+
     AssetLoader::getInstance().shutdown();
     JobSystem::shutdown();
 }
@@ -34,6 +42,8 @@ bool Application::initialize(int width, int height, const std::string& title)
 	TextureLoader::getInstance().registerLoader(renderer.get());
     ShaderLoader::getInstance().registerLoader(renderer.get());
     AssetLoader::getInstance().initialize(renderer.get());
+
+    ScriptEngine::getInstance().initialize();
 
     currentState = std::make_unique<GameplayState>(*renderer);
     currentState->onEnter();

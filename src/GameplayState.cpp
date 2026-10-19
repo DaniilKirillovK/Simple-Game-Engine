@@ -7,6 +7,7 @@
 #include "Systems/CameraSystem.h"
 #include "Systems/PhysicsSystem.h"
 #include "Systems/TransformSystem.h"
+#include "Systems/ScriptSystem.h"
 
 #include <filesystem>
 #include "Utils/Serialization/SceneSerializer.h"
@@ -33,12 +34,24 @@ void GameplayState::onEnter()
     m_world->addSystem(std::make_unique<PhysicsSystem>(&m_renderer));
     m_world->addSystem(std::make_unique<CameraSystem>());
     m_world->addSystem(std::make_unique<MovementSystem>());
+    m_world->addSystem(std::make_unique<ScriptSystem>(
+        [this](const std::string& primitive, const glm::vec3& position) {
+            return spawnPrimitive(primitive, position);
+        }));
     m_world->addSystem(std::make_unique<TransformSystem>());
     m_world->addSystem(std::make_unique<RenderSystem>(&m_renderer));
 
 	setupTestScene();
 
 	LOG_INFO("Enter Gameplay State");
+}
+
+void GameplayState::onExit()
+{
+    if (ScriptSystem* scriptSystem = m_world->getSystem<ScriptSystem>())
+    {
+        scriptSystem->stop();
+    }
 }
 
 void GameplayState::update(float deltaTime)
@@ -92,11 +105,21 @@ void GameplayState::enterPlayMode()
     }
 
     m_playModeActive = true;
+
+    if (ScriptSystem* scriptSystem = m_world->getSystem<ScriptSystem>())
+    {
+        scriptSystem->start(*m_world);
+    }
 }
 
 void GameplayState::exitPlayMode()
 {
     LOG_INFO("Exiting PLAY mode, restoring scene state");
+
+    if (ScriptSystem* scriptSystem = m_world->getSystem<ScriptSystem>())
+    {
+        scriptSystem->stop();
+    }
 
     if (PhysicsSystem* physicsSystem = m_world->getSystem<PhysicsSystem>())
     {
@@ -150,31 +173,34 @@ void GameplayState::createEmptyEntity()
 
 void GameplayState::createCubeEntity()
 {
-    createMeshEntity(MeshFactory::createCube(), "Cube",
+    EntityId e = createMeshEntity(MeshFactory::createCube(), "Cube",
         glm::vec4(0.8f, 0.8f, 0.8f, 1.0f), true);
+    if (e != INVALID_ENTITY) m_renderer.setSelectedEntity(e);
 }
 
 void GameplayState::createSphereEntity()
 {
-    createMeshEntity(MeshFactory::createSphere(0.5f, 36, 18), "Sphere",
+    EntityId e = createMeshEntity(MeshFactory::createSphere(0.5f, 36, 18), "Sphere",
         glm::vec4(0.8f, 0.6f, 0.2f, 1.0f), true);
+    if (e != INVALID_ENTITY) m_renderer.setSelectedEntity(e);
 }
 
 void GameplayState::createFromAsset(Mesh* mesh, const std::string& path)
 {
     if (!mesh) return;
     std::string name = std::filesystem::path(path).stem().string();
-    createMeshEntity(mesh, name, glm::vec4(0.8f, 0.8f, 0.8f, 1.0f), false);
+    EntityId e = createMeshEntity(mesh, name, glm::vec4(0.8f, 0.8f, 0.8f, 1.0f), false);
+    if (e != INVALID_ENTITY) m_renderer.setSelectedEntity(e);
 }
 
-void GameplayState::createMeshEntity(Mesh* mesh, const std::string& tagName, const glm::vec4& color, bool withPhysics)
+EntityId GameplayState::createMeshEntity(Mesh* mesh, const std::string& tagName, const glm::vec4& color, bool withPhysics)
 {
-    if (!mesh) return;
+    if (!mesh) return INVALID_ENTITY;
 
     auto vertShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
     auto fragShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
 
-    if (!vertShader || !fragShader) return;
+    if (!vertShader || !fragShader) return INVALID_ENTITY;
 
     Material* material = new Material{
         color,
@@ -201,7 +227,28 @@ void GameplayState::createMeshEntity(Mesh* mesh, const std::string& tagName, con
         cPool.addComponent(e, Collider{ 0.5f });
     }
 
-    m_renderer.setSelectedEntity(e);
     LOG_INFO("Created entity: " + std::to_string(e) + " (" + tagName + ")");
+    return e;
+}
+
+EntityId GameplayState::spawnPrimitive(const std::string& primitive, const glm::vec3& position)
+{
+    EntityId e = INVALID_ENTITY;
+    if (primitive == "cube")
+    {
+        e = createMeshEntity(MeshFactory::createCube(), "Cube",
+            glm::vec4(0.8f, 0.8f, 0.8f, 1.0f), true);
+    }
+    else if (primitive == "sphere")
+    {
+        e = createMeshEntity(MeshFactory::createSphere(0.5f, 36, 18), "Sphere",
+            glm::vec4(0.8f, 0.6f, 0.2f, 1.0f), true);
+    }
+
+    if (Transform* transform = m_world->getComponent<Transform>(e))
+    {
+        transform->position = position;
+    }
+    return e;
 }
 

@@ -10,6 +10,9 @@ set(GLM_DIR "${CMAKE_SOURCE_DIR}/libs/glm")
 set(ASSIMP_DIR "${CMAKE_SOURCE_DIR}/libs/assimp")
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/libs/imgui")
 set(IMGUIZMO_DIR "${CMAKE_SOURCE_DIR}/libs/imgui/imguizmo")
+set(PYBIND11_DIR "${CMAKE_SOURCE_DIR}/libs/pybind11")
+# Python 3.12: headers + import lib for build, embeddable package shipped next to the exe
+set(PYTHON_DIR "${CMAKE_SOURCE_DIR}/libs/python")
 
 file(GLOB IMGUI_SOURCES
     "${IMGUI_DIR}/*.cpp"
@@ -26,10 +29,14 @@ set(GLFW_LIB_NAME "glfw3")
 set(ASSIMP_LIB_DIR "${ASSIMP_DIR}/lib")
 set(ASSIMP_LIB_NAME "assimp-vc143-mt")
 
-add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} ${IMGUIZMO_DIR} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp" "src/Utils/HierarchyUtils.cpp" "src/Utils/json.hpp" "src/Systems/TransformSystem.cpp" "src/Utils/Serialization/SceneSerializer.cpp" "src/Utils/Assets/AssetsUtils.cpp" "external/tracy/TracyClient.cpp" "src/JobSystem/JobSystem.cpp" "src/Resources/AssetLoader.cpp")
+add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} ${IMGUIZMO_DIR} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp" "src/Utils/HierarchyUtils.cpp" "src/Utils/json.hpp" "src/Systems/TransformSystem.cpp" "src/Utils/Serialization/SceneSerializer.cpp" "src/Utils/Assets/AssetsUtils.cpp" "external/tracy/TracyClient.cpp" "src/JobSystem/JobSystem.cpp" "src/Resources/AssetLoader.cpp" "src/Scripting/ScriptEngine.cpp" "src/Scripting/ScriptBindings.cpp" "src/Systems/ScriptSystem.cpp")
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE TRACY_ENABLE)
-add_compile_definitions(TRACY_ON_DEMAND)
+target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_SCRIPTS_SOURCE_DIR="${CMAKE_SOURCE_DIR}/scripts")
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /bigobj)
+endif()
+#add_compile_definitions(TRACY_ON_DEMAND)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}
@@ -40,16 +47,20 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${GLFW_DIR}/include
     ${GLM_DIR}
     ${ASSIMP_DIR}/include
+    ${PYBIND11_DIR}/include
+    ${PYTHON_DIR}/include
 )
 
 target_link_directories(${PROJECT_NAME} PRIVATE
     ${GLFW_LIB_DIR}
     ${ASSIMP_LIB_DIR}
+    ${PYTHON_DIR}/lib
 )
 
 target_link_libraries(${PROJECT_NAME}
     ${GLFW_LIB_NAME}
     ${ASSIMP_LIB_NAME}
+    python312
     opengl32
 )
 
@@ -79,6 +90,20 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         "${ASSIMP_DIR}/lib/${ASSIMP_LIB_NAME}.dll"
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/${ASSIMP_LIB_NAME}.dll
     COMMENT "Copying Assimp DLL to output directory"
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${PYTHON_DIR}/embed
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/python
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${PYTHON_DIR}/embed/python312.dll
+        ${PYTHON_DIR}/embed/python3.dll
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/scripts
+    COMMENT "Copying Python runtime and scripts to output directory"
 )
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

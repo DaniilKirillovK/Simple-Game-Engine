@@ -9,6 +9,7 @@
 #include "Components/Hierarchy.h"
 #include "Components/Light.h"
 #include "Components/Camera.h"
+#include "Components/Script.h"
 #include "IRenderAdapter.h"
 #include <string>
 
@@ -30,6 +31,7 @@ public:
     static nlohmann::json serializeCollider(const Collider& collider);
     static nlohmann::json serializeHierarchy(const Hierarchy& hierarchy);
     static nlohmann::json serializeCamera(const Camera& camera);
+    static nlohmann::json serializeScript(const Script& script);
 
     static void deserializeTransform(Transform& transform, const nlohmann::json& j);
     static void deserializeTag(Tag& tag, const nlohmann::json& j);
@@ -39,6 +41,7 @@ public:
     static void deserializeCollider(Collider& collider, const nlohmann::json& j);
     static void deserializeHierarchy(Hierarchy& hierarchy, const nlohmann::json& j);
     static void deserializeCamera(Camera& camera, const nlohmann::json& j);
+    static void deserializeScript(Script& script, const nlohmann::json& j);
 
 private:
     static Mesh* createPrimitiveMesh(const nlohmann::json& meshJson);

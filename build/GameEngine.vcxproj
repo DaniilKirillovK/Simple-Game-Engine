@@ -111,12 +111,12 @@
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\src;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external\tracy;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\glad\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glfw\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glm;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -206,14 +206,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\src;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external\tracy;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\glad\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glfw\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glm;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -303,14 +303,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\src;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external\tracy;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\glad\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glfw\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glm;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -401,12 +401,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;TRACY_ON_DEMAND;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;TRACY_ENABLE;IMGUI_DISABLE_OBSOLETE_KEYIO=0;IMGUI_HAS_VIEWPORT=1;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\src;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\external\tracy;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\glad\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glfw\include;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\glm;C:\Users\MSI SWORD 15\Desktop\localReps\Simple-Game-Engine\libs\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>

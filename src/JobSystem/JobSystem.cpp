@@ -127,14 +127,12 @@ void JobSystem::wait(JobCounter* counter)
         Priority prio = Priority::Normal;
         bool didWork = false;
 
-        // Own deque first — our children are usually here.
         if (myIdx != UINT32_MAX && tryPopJob(myIdx, job, prio)) 
         {
             executeJob(job);
             didWork = true;
         }
 
-        // Then steal from others.
         if (!didWork && tryStealJob(myIdx, job, prio))
         {
             executeJob(job);
@@ -181,7 +179,6 @@ void JobSystem::workerLoop(uint32_t id)
 
         {
             //ZoneScopedN("Worker::Idle");
-            // 3. Nothing to do — wait briefly.
             std::unique_lock<std::mutex> lock(m_cvMutex);
             m_cv.wait_for(lock, std::chrono::microseconds(100), [this, id] {
                 if (m_stop.load()) return true;
