@@ -24,6 +24,8 @@
 #include "Components/Tag.h"
 #include "Components/Rigidbody.h"
 #include "Components/Collider.h"
+#include "Components/Script.h"
+#include "Scripting/ScriptInspector.h"
 
 #include "Utils/HierarchyUtils.h"
 #include "Utils/Serialization/SceneSerializer.h"
@@ -1098,6 +1100,26 @@ void OpenGLRenderAdapter::renderInspector()
                 m_world->getComponentPool<Collider>().addComponent(m_selectedEntity, Collider{});
             }
         }
+    }
+
+    if (Script* script = m_world->getComponent<Script>(m_selectedEntity))
+    {
+        ImGui::PushID("ScriptComponent");
+
+        const bool isPlaying = ScriptEngine::getInstance().getActiveSystem() != nullptr;
+
+        ImGui::BeginDisabled(isPlaying);
+
+        ScriptInspector::draw(*script, *m_world);
+
+        ImGui::EndDisabled();
+
+        if (isPlaying)
+        {
+            ImGui::TextWrapped("Stop Play mode to edit script settings.");
+        }
+
+        ImGui::PopID();
     }
 
     ImGui::End();

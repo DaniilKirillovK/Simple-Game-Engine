@@ -34,6 +34,11 @@ public:
 
 	void clear();
 
+	const std::unordered_set<EntityId>& getEntities() const
+	{
+		return entities;
+	}
+
 private:
 	float m_currentDeltaTime;
 	EntityId nextEntityId;

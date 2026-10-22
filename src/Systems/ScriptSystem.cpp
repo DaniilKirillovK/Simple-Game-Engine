@@ -4,6 +4,8 @@
 #include "Components/Script.h"
 #include "World.h"
 #include "Logger.h"
+#include "Scripting/ScriptFields.h"
+
 #include <algorithm>
 
 #include "tracy/Tracy.hpp"
@@ -88,8 +90,12 @@ void ScriptSystem::start(World& world)
 	ScriptEngine& engine = ScriptEngine::getInstance();
 	if (!engine.isInitialized()) return;
 
+	static std::uint64_t nextSessionId = 0;
+
+	m_sessionId = ++nextSessionId;
 	m_world = &world;
 	m_running = true;
+
 	engine.setActiveSystem(this);
 
 	// Copy: behaviours may spawn entities and grow the pool while starting
@@ -102,7 +108,7 @@ void ScriptSystem::start(World& world)
 
 	for (const auto& [entity, script] : scripts)
 	{
-		createBehaviour(entity, script.moduleName, script.className);
+		createBehaviour(entity, script);
 	}
 
 	// on_start after every behaviour exists, so scripts can find each other
@@ -170,24 +176,55 @@ void ScriptSystem::requestDestroy(EntityId entity)
 	}
 }
 
-void ScriptSystem::createBehaviour(EntityId entity, const std::string& moduleName, const std::string& className)
+void ScriptSystem::createBehaviour(
+	EntityId entity,
+	const Script& script)
 {
-	py::object behaviourClass = ScriptEngine::getInstance().loadBehaviourClass(moduleName, className);
-	if (behaviourClass.is_none()) return;
-
 	try
 	{
+		py::object behaviourClass = ScriptEngine::getInstance().loadBehaviourClass
+		(
+				script.moduleName,
+				script.className
+		);
+
+		if (behaviourClass.is_none())
+		{
+			return;
+		}
+
 		py::object behaviour = behaviourClass();
-		behaviour.cast<ScriptBehaviour*>()->entityId = entity;
+
+		ScriptBehaviour* nativeBehaviour = behaviour.cast<ScriptBehaviour*>();
+
+		nativeBehaviour->entityId = entity;
+
+		ScriptFields::apply
+		(
+			behaviour,
+			behaviourClass,
+			script
+		);
+
 		m_behaviours[entity] = std::move(behaviour);
 	}
 	catch (const py::cast_error&)
 	{
-		LOG_ERROR("Script class " + moduleName + "." + className + " must derive from engine.Behaviour");
+		LOG_ERROR
+		(
+			"Script class " +
+			script.moduleName + "." + script.className +
+			" must derive from engine.Behaviour"
+		);
 	}
 	catch (const std::exception& e)
 	{
-		ScriptEngine::logPythonError("Failed to create " + moduleName + "." + className, e);
+		ScriptEngine::logPythonError
+		(
+			"Failed to create " +
+			script.moduleName + "." + script.className,
+			e
+		);
 	}
 }
 
