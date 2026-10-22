@@ -8,6 +8,7 @@
 #include "Resources/AssetLoader.h"
 #include "MeshFactory.h"
 #include "tracy/Tracy.hpp"
+#include "Scripting/EntityReferenceData.h"
 
 bool SceneSerializer::saveScene(World& world, const std::string& filepath)
 {
@@ -266,7 +267,15 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         if (d.script)
         {
             Script s;
+
             deserializeScript(s, *d.script);
+
+            EntityReferenceData::remapFields
+            (
+                s.fields,
+                idMap
+            );
+
             sPool.addComponent(newId, s);
         }
     }
@@ -740,16 +749,31 @@ Mesh* SceneSerializer::createPrimitiveMesh(const nlohmann::json& meshJson)
     return MeshFactory::createCube();
 }
 
-nlohmann::json SceneSerializer::serializeScript(const Script& script)
+nlohmann::json SceneSerializer::serializeScript(
+    const Script& script)
 {
-	nlohmann::json j;
-	j["module"] = script.moduleName;
-	j["class"] = script.className;
-	return j;
+    nlohmann::json j;
+
+    j["module"] = script.moduleName;
+    j["class"] = script.className;
+    j["fields"] = script.fields;
+
+    return j;
 }
 
-void SceneSerializer::deserializeScript(Script& script, const nlohmann::json& j)
+void SceneSerializer::deserializeScript(
+    Script& script,
+    const nlohmann::json& j)
 {
-	script.moduleName = j.value("module", "");
-	script.className = j.value("class", "");
+    script.moduleName = j.value("module", "");
+    script.className = j.value("class", "");
+
+    if (j.contains("fields") && j["fields"].is_object())
+    {
+        script.fields = j["fields"];
+    }
+    else
+    {
+        script.fields = nlohmann::json::object();
+    }
 }

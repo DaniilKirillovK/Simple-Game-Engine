@@ -8,6 +8,8 @@
 
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
+#include <cstdint>
+#include <functional>
 
 #include "Scripting/ScriptEngine.h"
 #include "Scripting/ScriptBehaviour.h"
@@ -46,6 +48,19 @@ public:
 struct EntityHandle
 {
 	EntityId id = INVALID_ENTITY;
+	std::uint64_t sessionId = 0;
+
+	EntityHandle() = default;
+
+	explicit EntityHandle(EntityId entityId) : id(entityId)
+	{
+		ScriptSystem* system = ScriptEngine::getInstance().getActiveSystem();
+
+		if (system)
+		{
+			sessionId = system->getSessionId();
+		}
+	}
 };
 
 ScriptSystem& activeSystem()
@@ -63,14 +78,21 @@ World& activeWorld()
 bool isValid(const EntityHandle& entity)
 {
 	ScriptSystem* system = ScriptEngine::getInstance().getActiveSystem();
-	return system && system->getWorld().isValidEntity(entity.id);
+
+	return system &&
+		entity.sessionId == system->getSessionId() &&
+		system->getWorld().isValidEntity(entity.id);
 }
 
 void requireValid(const EntityHandle& entity)
 {
-	if (!activeWorld().isValidEntity(entity.id))
+	if (!isValid(entity))
 	{
-		throw std::runtime_error("Entity " + std::to_string(entity.id) + " is destroyed");
+		throw std::runtime_error
+		(
+			"Entity " + std::to_string(entity.id) +
+			" is destroyed or belongs to an expired Play session"
+		);
 	}
 }
 
@@ -179,9 +201,29 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 		.def_property("velocity",
 			[](const EntityHandle& e) { return requireComponent<Rigidbody>(e, "Rigidbody").velocity; },
 			[](const EntityHandle& e, const glm::vec3& value) { requireComponent<Rigidbody>(e, "Rigidbody").velocity = value; })
-		.def("destroy", [](const EntityHandle& e) { activeSystem().requestDestroy(e.id); })
-		.def("__eq__", [](const EntityHandle& a, const EntityHandle& b) { return a.id == b.id; })
-		.def("__hash__", [](const EntityHandle& e) { return e.id; })
+		.def("destroy",
+			[](const EntityHandle& entity)
+			{
+				requireValid(entity);
+				activeSystem().requestDestroy(entity.id);
+			})
+		.def("__eq__",
+			[](const EntityHandle& a, const EntityHandle& b)
+			{
+				return a.id == b.id &&
+					a.sessionId == b.sessionId;
+			})
+		.def("__hash__",
+			[](const EntityHandle& entity)
+			{
+				const std::size_t idHash = std::hash<EntityId>{}(entity.id);
+
+				const std::size_t sessionHash = std::hash<std::uint64_t>{}(entity.sessionId);
+
+				return idHash ^
+					(sessionHash + static_cast<std::size_t>(0x9e3779b9) +
+						(idHash << 6) + (idHash >> 2));
+			})
 		.def("__repr__", [](const EntityHandle& e) { return "Entity(" + std::to_string(e.id) + ")"; });
 
 	py::class_<ScriptBehaviour, PyScriptBehaviour>(m, "Behaviour")
@@ -201,7 +243,15 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 			return EntityHandle{ entity };
 		}, "primitive"_a, "position"_a = glm::vec3(0.0f));
 
-	m.def("destroy", [](const EntityHandle& e) { activeSystem().requestDestroy(e.id); }, "entity"_a);
+	m.def(
+		"destroy",
+		[](const EntityHandle& entity)
+		{
+			requireValid(entity);
+			activeSystem().requestDestroy(entity.id);
+		},
+		"entity"_a
+	);
 
 	m.def("find", [](const std::string& name) -> py::object
 		{
@@ -211,6 +261,31 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 		}, "name"_a);
 
 	m.def("find_all", &findAll, "name"_a);
+
+	m.def(
+		"current_session_id",
+		[]()
+		{
+			return activeSystem().getSessionId();
+		}
+	);
+
+	m.def(
+		"resolve_entity",
+		[](EntityId id, std::uint64_t sessionId) -> py::object
+		{
+			EntityHandle handle{ id };
+
+			if (handle.sessionId != sessionId || !isValid(handle))
+			{
+				return py::none();
+			}
+
+			return py::cast(handle);
+		},
+		"id"_a,
+		"session_id"_a
+	);
 
 	py::enum_<KeyCode> keys(m, "Key");
 	keys.value("SPACE", KeyCode::KEY_SPACE)
