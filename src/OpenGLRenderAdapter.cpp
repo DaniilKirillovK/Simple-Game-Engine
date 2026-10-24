@@ -32,6 +32,10 @@
 #include "libs/imgui/imgui_internal.h"
 #include <Resources/ResourceManager.h>
 #include "MeshFactory.h"
+#include "Gameplay/PrefabLibrary.h"
+#include "Components/PrefabInstance.h"
+#include "Systems/ScriptSystem.h"
+#include <optional>
 
 static const char* debugVertexShaderSource = R"(
     #version 330 core
@@ -666,6 +670,169 @@ void OpenGLRenderAdapter::renderUI()
     if (m_showStatistics) renderStatistics();
     if (m_showLogPanel) renderLogPanel();
     if (m_showAssetBrowser) renderAssetBrowser();
+    if (m_showPrefabs) renderPrefabPanel();
+}
+
+void OpenGLRenderAdapter::renderPrefabFieldsEditor()
+{
+    // Follow the file until the user starts editing, then keep the local copy
+    if (!m_editedPrefabDirty)
+    {
+        std::optional<Script> script = m_prefabLibrary->getScript(m_editedPrefab);
+        if (!script)
+        {
+            ImGui::TextDisabled("'%s' has no script or failed to load (see log)", m_editedPrefab.c_str());
+            return;
+        }
+        m_editedPrefabScript = std::move(*script);
+    }
+
+    ImGui::Text("Prefab fields: %s", m_editedPrefab.c_str());
+    ImGui::TextDisabled("%s.%s", m_editedPrefabScript.moduleName.c_str(), m_editedPrefabScript.className.c_str());
+
+    ImGui::PushID("PrefabFields");
+    ScriptInspector::DrawOptions options;
+    options.allowEntityReferences = false;
+    if (ScriptInspector::drawFields(m_editedPrefabScript, *m_world, options))
+    {
+        m_editedPrefabDirty = true;
+    }
+    ImGui::PopID();
+
+    ImGui::BeginDisabled(!m_editedPrefabDirty);
+    if (ImGui::Button("Save to prefab"))
+    {
+        if (m_prefabLibrary->saveScriptFields(m_editedPrefab, m_editedPrefabScript.fields))
+        {
+            m_editedPrefabDirty = false;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Discard"))
+    {
+        m_editedPrefabDirty = false;
+    }
+    ImGui::EndDisabled();
+
+    if (m_editedPrefabDirty)
+    {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "unsaved");
+    }
+    else if (m_isPlaying)
+    {
+        ImGui::TextDisabled("Saved values apply to the next spawn");
+    }
+}
+
+void OpenGLRenderAdapter::renderPrefabPanel()
+{
+    if (!ImGui::Begin("Prefabs", &m_showPrefabs) || !m_prefabLibrary || !m_world)
+    {
+        ImGui::End();
+        return;
+    }
+
+    ImGui::TextDisabled("%s", m_prefabLibrary->getDirectory().string().c_str());
+
+    if (ImGui::Button("Refresh") || m_prefabListDirty)
+    {
+        m_prefabNames = m_prefabLibrary->list();
+        m_prefabListDirty = false;
+    }
+
+    ImGui::Separator();
+    if (m_prefabNames.empty())
+    {
+        ImGui::TextWrapped("No *.prefab.json files yet.");
+    }
+
+    for (const std::string& name : m_prefabNames)
+    {
+        ImGui::PushID(name.c_str());
+
+        // Instances created here are scene entities; during Play only scripts spawn
+        ImGui::BeginDisabled(m_isPlaying);
+        if (ImGui::SmallButton("Add to scene"))
+        {
+            EntityId entity = m_prefabLibrary->instantiate(*m_world, name, glm::vec3(0.0f, 1.0f, 0.0f));
+            if (entity != INVALID_ENTITY) m_selectedEntity = entity;
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+
+        // Template data may change during Play too: it only affects the next spawn
+        if (ImGui::Selectable(name.c_str(), m_editedPrefab == name))
+        {
+            if (m_editedPrefab != name)
+            {
+                m_editedPrefab = name;
+                m_editedPrefabDirty = false;
+            }
+        }
+        ImGui::PopID();
+    }
+
+    if (!m_editedPrefab.empty())
+    {
+        ImGui::Separator();
+        renderPrefabFieldsEditor();
+    }
+
+    ImGui::Separator();
+
+    ImGui::BeginDisabled(m_isPlaying);
+
+    const bool hasSelection = m_selectedEntity != INVALID_ENTITY && m_world->isValidEntity(m_selectedEntity);
+    if (hasSelection)
+    {
+        // Suggest the selected entity's name once per selection
+        if (m_prefabSaveNameEntity != m_selectedEntity)
+        {
+            m_prefabSaveNameEntity = m_selectedEntity;
+            std::string suggested;
+            if (Tag* tag = m_world->getComponent<Tag>(m_selectedEntity))
+            {
+                for (char c : tag->name)
+                {
+                    suggested += std::isalnum(static_cast<unsigned char>(c)) || c == '-' ? c : '_';
+                }
+            }
+            snprintf(m_prefabSaveName, sizeof(m_prefabSaveName), "%s", suggested.c_str());
+        }
+
+        ImGui::InputText("Name", m_prefabSaveName, sizeof(m_prefabSaveName));
+
+        const bool validName = PrefabLibrary::isValidName(m_prefabSaveName);
+        ImGui::BeginDisabled(!validName);
+        if (ImGui::Button("Save selected as prefab"))
+        {
+            if (m_prefabLibrary->saveFromEntity(*m_world, m_selectedEntity, m_prefabSaveName))
+            {
+                m_prefabListDirty = true;
+            }
+        }
+        ImGui::EndDisabled();
+
+        if (!validName)
+        {
+            ImGui::TextDisabled("Name: letters, digits, '_' and '-'");
+        }
+    }
+    else
+    {
+        ImGui::TextDisabled("Select an entity to save it as a prefab");
+    }
+
+    ImGui::EndDisabled();
+
+    if (m_isPlaying)
+    {
+        ImGui::TextWrapped("Stop Play mode to add prefabs to the scene or save new ones.");
+    }
+
+    ImGui::End();
 }
 
 void OpenGLRenderAdapter::renderUIViewport()
@@ -702,6 +869,23 @@ void OpenGLRenderAdapter::renderUIViewport()
         ImGui::Image((ImTextureID)(intptr_t)m_renderTexture, imageSize,
             ImVec2(0, 1),
             ImVec2(1, 0));
+
+        // Script HUD over the game image
+        if (ScriptSystem* scripts = ScriptEngine::getInstance().getActiveSystem())
+        {
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+            ImVec2 textPos(imagePos.x + 12.0f, imagePos.y + 10.0f);
+
+            for (const auto& [key, text] : scripts->getHud())
+            {
+                const ImVec2 size = ImGui::CalcTextSize(text.c_str());
+                drawList->AddRectFilled(ImVec2(textPos.x - 4.0f, textPos.y - 2.0f),
+                    ImVec2(textPos.x + size.x + 4.0f, textPos.y + size.y + 2.0f), IM_COL32(0, 0, 0, 150), 3.0f);
+                drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), text.c_str());
+                textPos.y += lineHeight;
+            }
+        }
 
         ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
         ImGuizmo::SetRect(imagePos.x, imagePos.y, imageSize.x, imageSize.y);
@@ -1108,9 +1292,69 @@ void OpenGLRenderAdapter::renderInspector()
 
         const bool isPlaying = ScriptEngine::getInstance().getActiveSystem() != nullptr;
 
+        // Prefab instance: compare with the template, apply or revert
+        PrefabInstance* instance = m_world->getComponent<PrefabInstance>(m_selectedEntity);
+        std::optional<Script> prefabScript;
+        if (instance && m_prefabLibrary)
+        {
+            prefabScript = m_prefabLibrary->getScript(instance->prefab);
+        }
+        const bool linked = prefabScript &&
+            prefabScript->moduleName == script->moduleName &&
+            prefabScript->className == script->className;
+
+        ScriptInspector::DrawOptions options;
+        if (linked) options.baseline = &prefabScript->fields;
+
         ImGui::BeginDisabled(isPlaying);
 
-        ScriptInspector::draw(*script, *m_world);
+        ScriptInspector::draw(*script, *m_world, options);
+
+        if (instance)
+        {
+            ImGui::Separator();
+            ImGui::Text("Prefab: %s", instance->prefab.c_str());
+
+            if (!prefabScript)
+            {
+                ImGui::TextDisabled("Template is missing or has no script");
+            }
+            else if (!linked)
+            {
+                ImGui::TextDisabled("Template uses another behaviour class");
+            }
+            else
+            {
+                if (ImGui::Button("Apply fields to prefab"))
+                {
+                    nlohmann::json merged = prefabScript->fields.is_object()
+                        ? prefabScript->fields : nlohmann::json::object();
+                    merged.update(script->fields);
+                    m_prefabLibrary->saveScriptFields(instance->prefab, merged);
+                }
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::SetTooltip("Next spawns of '%s' use these values", instance->prefab.c_str());
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("Revert to prefab"))
+                {
+                    // Scene references are not part of the template, keep them
+                    nlohmann::json reverted = prefabScript->fields.is_object()
+                        ? prefabScript->fields : nlohmann::json::object();
+                    for (const auto& item : script->fields.items())
+                    {
+                        if (EntityReferenceData::isReference(item.value()))
+                        {
+                            reverted[item.key()] = item.value();
+                        }
+                    }
+                    script->fields = std::move(reverted);
+                }
+            }
+        }
 
         ImGui::EndDisabled();
 
@@ -1241,6 +1485,7 @@ void OpenGLRenderAdapter::renderMainMenuBar()
             ImGui::MenuItem("Viewport", nullptr, &m_showViewport);
             ImGui::MenuItem("Log Console", nullptr, &m_showLogPanel);
             ImGui::MenuItem("Asset Browser", nullptr, &m_showAssetBrowser);
+            ImGui::MenuItem("Prefabs", nullptr, &m_showPrefabs);
 
             ImGui::EndMenu();
         }

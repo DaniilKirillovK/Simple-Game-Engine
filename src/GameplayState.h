@@ -3,6 +3,8 @@
 #include "World.h"
 #include <string>
 #include "IRenderAdapter.h"
+#include "Gameplay/PrefabLibrary.h"
+#include <memory>
 
 struct Mesh;
 
@@ -43,4 +45,5 @@ private:
 
     IRenderAdapter& m_renderer;
     World* m_world;
+    std::unique_ptr<PrefabLibrary> m_prefabs;
 };

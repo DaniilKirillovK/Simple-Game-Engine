@@ -13,9 +13,9 @@
 #include <string>
 #include <vector>
 
-namespace ScriptFields
+class ScriptFields
 {
-    namespace py = pybind11;
+public:
     using Json = nlohmann::json;
 
     enum class Type
@@ -42,36 +42,36 @@ namespace ScriptFields
         std::vector<std::string> options;
     };
 
-    inline Json pythonScalarToJson(py::handle value)
+    static Json pythonScalarToJson(pybind11::handle value)
     {
         if (value.is_none())
         {
             return nullptr;
         }
-        if (py::isinstance<py::bool_>(value))
+        if (pybind11::isinstance<pybind11::bool_>(value))
         {
-            return py::cast<bool>(value);
+            return pybind11::cast<bool>(value);
         }
 
-        if (py::isinstance<py::int_>(value))
+        if (pybind11::isinstance<pybind11::int_>(value))
         {
-            return py::cast<long long>(value);
+            return pybind11::cast<long long>(value);
         }
 
-        if (py::isinstance<py::float_>(value))
+        if (pybind11::isinstance<pybind11::float_>(value))
         {
-            return py::cast<double>(value);
+            return pybind11::cast<double>(value);
         }
 
-        if (py::isinstance<py::str>(value))
+        if (pybind11::isinstance<pybind11::str>(value))
         {
-            return py::cast<std::string>(value);
+            return pybind11::cast<std::string>(value);
         }
 
         throw std::runtime_error("Editable defaults must be None, bool, int, float or str");
     }
 
-    inline std::string validationError(
+    static std::string validationError(
         const Field& field,
         const Json& value)
     {
@@ -187,36 +187,36 @@ namespace ScriptFields
         return {};
     }
 
-    inline std::vector<Field> readSchema(py::handle behaviourClass)
+    static std::vector<Field> readSchema(pybind11::handle behaviourClass)
     {
         std::vector<Field> result;
 
-        if (!py::hasattr(behaviourClass, "editor_fields"))
+        if (!pybind11::hasattr(behaviourClass, "editor_fields"))
         {
             return result;
         }
 
-        py::object declaration = behaviourClass.attr("editor_fields");
+        pybind11::object declaration = behaviourClass.attr("editor_fields");
 
-        if (!py::isinstance<py::dict>(declaration))
+        if (!pybind11::isinstance<pybind11::dict>(declaration))
         {
             throw std::runtime_error("editor_fields must be a dict");
         }
 
-        py::dict definitions = declaration.cast<py::dict>();
+        pybind11::dict definitions = declaration.cast<pybind11::dict>();
 
         for (auto item : definitions)
         {
             Field field;
-            field.name = py::cast<std::string>(item.first);
+            field.name = pybind11::cast<std::string>(item.first);
             field.label = field.name;
 
-            if (!py::isinstance<py::dict>(item.second))
+            if (!pybind11::isinstance<pybind11::dict>(item.second))
             {
                 throw std::runtime_error( "Field '" + field.name + "' must be a dict");
             }
 
-            py::dict definition = py::reinterpret_borrow<py::dict>(item.second);
+            pybind11::dict definition = pybind11::reinterpret_borrow<pybind11::dict>(item.second);
 
             if (!definition.contains("type") ||
                 !definition.contains("default"))
@@ -224,7 +224,7 @@ namespace ScriptFields
                 throw std::runtime_error("Field '" + field.name + "' requires type and default");
             }
 
-            const std::string type = py::cast<std::string>(definition["type"]);
+            const std::string type = pybind11::cast<std::string>(definition["type"]);
 
             if (type == "float")
             {
@@ -257,19 +257,19 @@ namespace ScriptFields
 
             if (definition.contains("label"))
             {
-                field.label = py::cast<std::string>(definition["label"]);
+                field.label = pybind11::cast<std::string>(definition["label"]);
             }
 
             field.defaultValue = pythonScalarToJson(definition["default"]);
 
             if (definition.contains("min"))
             {
-                field.minimum = py::cast<double>(definition["min"]);
+                field.minimum = pybind11::cast<double>(definition["min"]);
             }
 
             if (definition.contains("max"))
             {
-                field.maximum = py::cast<double>(definition["max"]);
+                field.maximum = pybind11::cast<double>(definition["max"]);
             }
 
             const bool numeric =
@@ -326,17 +326,17 @@ namespace ScriptFields
                     throw std::runtime_error("Enum requires options: " + field.name);
                 }
 
-                py::object options = definition["options"];
+                pybind11::object options = definition["options"];
 
-                if (!py::isinstance<py::list>(options) &&
-                    !py::isinstance<py::tuple>(options))
+                if (!pybind11::isinstance<pybind11::list>(options) &&
+                    !pybind11::isinstance<pybind11::tuple>(options))
                 {
                     throw std::runtime_error("Enum options must be a list or tuple: " +field.name);
                 }
 
-                for (py::handle option : py::reinterpret_borrow<py::iterable>(options))
+                for (pybind11::handle option : pybind11::reinterpret_borrow<pybind11::iterable>(options))
                 {
-                    field.options.push_back(py::cast<std::string>(option));
+                    field.options.push_back(pybind11::cast<std::string>(option));
                 }
 
                 if (field.options.empty())
@@ -358,7 +358,7 @@ namespace ScriptFields
         return result;
     }
 
-    inline Json effectiveValue(
+    static Json effectiveValue(
         const Script& script,
         const Field& field)
     {
@@ -371,7 +371,7 @@ namespace ScriptFields
         return field.defaultValue;
     }
 
-    inline py::object toPython(
+    static pybind11::object toPython(
         const Field& field,
         const Json& value)
     {
@@ -379,17 +379,17 @@ namespace ScriptFields
         {
             case Type::Float:
             {
-                return py::float_(value.get<double>());
+                return pybind11::float_(value.get<double>());
             }
 
             case Type::Int:
             {
-                return py::int_(value.get<int>());
+                return pybind11::int_(value.get<int>());
             }
 
             case Type::Bool:
             {
-                return py::bool_(value.get<bool>());
+                return pybind11::bool_(value.get<bool>());
             }
 
             case Type::String: 
@@ -397,7 +397,7 @@ namespace ScriptFields
             }
             case Type::Enum:
             {
-                return py::str(value.get<std::string>());
+                return pybind11::str(value.get<std::string>());
             }
             case Type::Entity:
             {
@@ -405,12 +405,12 @@ namespace ScriptFields
 
                 if (id == INVALID_ENTITY)
                 {
-                    return py::none();
+                    return pybind11::none();
                 }
 
-                py::module_ engine = py::module_::import("engine");
+                pybind11::module_ engine = pybind11::module_::import("engine");
 
-                py::object sessionId = engine.attr("current_session_id")();
+                pybind11::object sessionId = engine.attr("current_session_id")();
 
                 return engine.attr("resolve_entity")(id, sessionId);
             }
@@ -419,9 +419,9 @@ namespace ScriptFields
         throw std::runtime_error("Unsupported field type");
     }
 
-    inline void apply(
-        py::object& behaviour,
-        py::handle behaviourClass,
+    static void apply(
+        pybind11::object& behaviour,
+        pybind11::handle behaviourClass,
         const Script& script)
     {
         const std::vector<Field> schema = readSchema(behaviourClass);
@@ -443,7 +443,7 @@ namespace ScriptFields
 
             if (field.type == Type::Entity)
             {
-                py::module_ helpers = py::module_::import("engine_fields");
+                pybind11::module_ helpers = pybind11::module_::import("engine_fields");
 
                 helpers.attr("install_entity_field")
                     (
@@ -455,4 +455,4 @@ namespace ScriptFields
             behaviour.attr(field.name.c_str()) = toPython(field, value);
         }
     }
-}
+};

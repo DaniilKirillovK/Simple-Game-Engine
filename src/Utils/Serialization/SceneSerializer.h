@@ -10,8 +10,10 @@
 #include "Components/Light.h"
 #include "Components/Camera.h"
 #include "Components/Script.h"
+#include "Components/PrefabInstance.h"
 #include "IRenderAdapter.h"
 #include <string>
+#include <unordered_map>
 
 class JobSystem;
 
@@ -22,6 +24,12 @@ public:
     static bool loadScene(IRenderAdapter& renderAdapter, World& world, const std::string& filepath);
     static nlohmann::json serializeWorld(World& world);
     static void deserializeWorld(IRenderAdapter& renderAdapter, World& world, const nlohmann::json& j);
+
+    // One entity's components (no "id"). Shared by scenes and prefabs.
+    static nlohmann::json serializeEntity(World& world, EntityId entity);
+    // idMap remaps entity references in script fields; references absent from it become null
+    static void deserializeEntity(IRenderAdapter& renderAdapter, World& world, EntityId entity,
+        const nlohmann::json& entityJson, const std::unordered_map<EntityId, EntityId>& idMap);
 
     static nlohmann::json serializeTransform(const Transform& transform);
     static nlohmann::json serializeTag(const Tag& tag);

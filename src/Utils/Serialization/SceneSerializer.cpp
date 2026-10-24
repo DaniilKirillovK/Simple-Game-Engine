@@ -71,76 +71,16 @@ nlohmann::json SceneSerializer::serializeWorld(World& world)
     nlohmann::json j;
     j["version"] = 1;
 
-    auto& tPool = world.getComponentPool<Transform>();
-    auto& tagPool = world.getComponentPool<Tag>();
-    auto& lPool = world.getComponentPool<Light>();
-    auto& mrPool = world.getComponentPool<MeshRenderer>();
-    auto& rbPool = world.getComponentPool<Rigidbody>();
-    auto& cPool = world.getComponentPool<Collider>();
-    auto& hPool = world.getComponentPool<Hierarchy>();
-    auto& camPool = world.getComponentPool<Camera>();
-    auto& sPool = world.getComponentPool<Script>();
-
-    std::vector<EntityId> allEntities;
-    allEntities.reserve(
-        tPool.size() + tagPool.size() + lPool.size() + mrPool.size() +
-        rbPool.size() + cPool.size() + hPool.size() + camPool.size() + sPool.size());
-    auto append = [&](auto& pool) {
-        for (EntityId e : pool.entities())
-            allEntities.push_back(e);
-        };
-    append(tPool); append(tagPool); append(lPool); append(mrPool);
-    append(rbPool); append(cPool); append(hPool); append(camPool); append(sPool);
-
+    std::vector<EntityId> allEntities(world.getEntities().begin(), world.getEntities().end());
     std::sort(allEntities.begin(), allEntities.end());
-    allEntities.erase(std::unique(allEntities.begin(), allEntities.end()),
-        allEntities.end());
 
     nlohmann::json entitiesJson = nlohmann::json::array();
     entitiesJson.get_ref<nlohmann::json::array_t&>().reserve(allEntities.size());
 
     for (EntityId e : allEntities)
     {
-        nlohmann::json ej;
+        nlohmann::json ej = serializeEntity(world, e);
         ej["id"] = e;
-
-        if (auto* t = tPool.getComponent(e))
-        {
-            ej["transform"] = serializeTransform(*t);
-        }
-        if (auto* t = tagPool.getComponent(e))
-        {
-            ej["tag"] = serializeTag(*t);
-        }
-        if (auto* t = mrPool.getComponent(e))
-        {
-            ej["mesh_renderer"] = serializeMeshRenderer(*t);
-        }
-        if (auto* t = rbPool.getComponent(e))
-        {
-            ej["rigidbody"] = serializeRigidbody(*t);
-        }
-        if (auto* t = cPool.getComponent(e))
-        {
-            ej["collider"] = serializeCollider(*t);
-        }
-        if (auto* t = hPool.getComponent(e))
-        {
-            ej["hierarchy"] = serializeHierarchy(*t);
-        }
-        if (auto* t = lPool.getComponent(e))
-        {
-            ej["light"] = serializeLight(*t);
-        }
-        if (auto* t = camPool.getComponent(e))
-        {
-            ej["camera"] = serializeCamera(*t);
-        }
-        if (auto* t = sPool.getComponent(e))
-        {
-            ej["script"] = serializeScript(*t);
-        }
-
         entitiesJson.push_back(std::move(ej));
     }
 
@@ -148,26 +88,62 @@ nlohmann::json SceneSerializer::serializeWorld(World& world)
     return j;
 }
 
+nlohmann::json SceneSerializer::serializeEntity(World& world, EntityId e)
+{
+    nlohmann::json ej = nlohmann::json::object();
+
+    if (auto* t = world.getComponent<Transform>(e))
+    {
+        ej["transform"] = serializeTransform(*t);
+    }
+    if (auto* t = world.getComponent<Tag>(e))
+    {
+        ej["tag"] = serializeTag(*t);
+    }
+    if (auto* t = world.getComponent<MeshRenderer>(e))
+    {
+        ej["mesh_renderer"] = serializeMeshRenderer(*t);
+    }
+    if (auto* t = world.getComponent<Rigidbody>(e))
+    {
+        ej["rigidbody"] = serializeRigidbody(*t);
+    }
+    if (auto* t = world.getComponent<Collider>(e))
+    {
+        ej["collider"] = serializeCollider(*t);
+    }
+    if (auto* t = world.getComponent<Hierarchy>(e))
+    {
+        ej["hierarchy"] = serializeHierarchy(*t);
+    }
+    if (auto* t = world.getComponent<Light>(e))
+    {
+        ej["light"] = serializeLight(*t);
+    }
+    if (auto* t = world.getComponent<Camera>(e))
+    {
+        ej["camera"] = serializeCamera(*t);
+    }
+    if (auto* t = world.getComponent<Script>(e))
+    {
+        ej["script"] = serializeScript(*t);
+    }
+    if (auto* t = world.getComponent<PrefabInstance>(e))
+    {
+        ej["prefab"] = { { "name", t->prefab } };
+    }
+
+    return ej;
+}
+
 void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& world, const nlohmann::json& j)
 {
     ZoneScopedN("SceneSerializer::deserializeWorld");
 
-    struct EntityData
-    {
-        EntityId oldId;
-        const nlohmann::json* transform = nullptr;
-        const nlohmann::json* tag = nullptr;
-        const nlohmann::json* light = nullptr;
-        const nlohmann::json* meshRenderer = nullptr;
-        const nlohmann::json* rigidbody = nullptr;
-        const nlohmann::json* collider = nullptr;
-        const nlohmann::json* hierarchy = nullptr;
-        const nlohmann::json* camera = nullptr;
-        const nlohmann::json* script = nullptr;
-    };
-
     const auto& entitiesArray = j["entities"];
-    std::vector<EntityData> entitiesData;
+
+    // Pass 1: allocate new ids, so entity references (hierarchy, script fields) can be remapped
+    std::vector<std::pair<EntityId, const nlohmann::json*>> entitiesData;
     entitiesData.reserve(entitiesArray.size());
 
     std::unordered_map<EntityId, EntityId> idMap;
@@ -178,113 +154,19 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         EntityId oldId = entityJson["id"].get<EntityId>();
         EntityId newId = world.createEntity();
         idMap[oldId] = newId;
-
-        EntityData d;
-        d.oldId = oldId;
-        if (entityJson.contains("transform"))     d.transform = &entityJson["transform"];
-        if (entityJson.contains("tag"))           d.tag = &entityJson["tag"];
-        if (entityJson.contains("light"))         d.light = &entityJson["light"];
-        if (entityJson.contains("mesh_renderer")) d.meshRenderer = &entityJson["mesh_renderer"];
-        if (entityJson.contains("rigidbody"))     d.rigidbody = &entityJson["rigidbody"];
-        if (entityJson.contains("collider"))      d.collider = &entityJson["collider"];
-        if (entityJson.contains("hierarchy"))     d.hierarchy = &entityJson["hierarchy"];
-        if (entityJson.contains("camera"))        d.camera = &entityJson["camera"];
-        if (entityJson.contains("script"))        d.script = &entityJson["script"];
-
-        entitiesData.push_back(d);
+        entitiesData.emplace_back(newId, &entityJson);
     }
 
-    auto& tPool = world.getComponentPool<Transform>();
-    auto& tagPool = world.getComponentPool<Tag>();
-    auto& lPool = world.getComponentPool<Light>();
-    auto& mrPool = world.getComponentPool<MeshRenderer>();
-    auto& rbPool = world.getComponentPool<Rigidbody>();
-    auto& cPool = world.getComponentPool<Collider>();
+    // Pass 2: components
+    for (const auto& [newId, entityJson] : entitiesData)
+    {
+        deserializeEntity(renderAdapter, world, newId, *entityJson, idMap);
+    }
+
+    // Pass 3: hierarchy links
     auto& hPool = world.getComponentPool<Hierarchy>();
-    auto& camPool = world.getComponentPool<Camera>();
-    auto& sPool = world.getComponentPool<Script>();
-
-    for (const auto& d : entitiesData)
+    for (const auto& [newId, entityJson] : entitiesData)
     {
-        EntityId newId = idMap[d.oldId];
-
-        if (d.transform)
-        {
-            Transform* t = tPool.getComponent(newId);
-            if (!t) { tPool.addComponent(newId, Transform{}); t = tPool.getComponent(newId); }
-            deserializeTransform(*t, *d.transform);
-        }
-
-        if (d.tag)
-        {
-            Tag* t = tagPool.getComponent(newId);
-            if (!t) { tagPool.addComponent(newId, Tag{}); t = tagPool.getComponent(newId); }
-            deserializeTag(*t, *d.tag);
-        }
-
-        if (d.light)
-        {
-            Light* l = lPool.getComponent(newId);
-            if (!l) { lPool.addComponent(newId, Light{}); l = lPool.getComponent(newId); }
-            deserializeLight(*l, *d.light);
-        }
-
-        if (d.meshRenderer)
-        {
-            MeshRenderer* m = mrPool.getComponent(newId);
-            if (!m) { mrPool.addComponent(newId, MeshRenderer{}); m = mrPool.getComponent(newId); }
-            deserializeMeshRenderer(renderAdapter, *m, *d.meshRenderer);
-        }
-
-        if (d.rigidbody)
-        {
-            Rigidbody* r = rbPool.getComponent(newId);
-            if (!r) { rbPool.addComponent(newId, Rigidbody{}); r = rbPool.getComponent(newId); }
-            deserializeRigidbody(*r, *d.rigidbody);
-        }
-
-        if (d.collider)
-        {
-            Collider* c = cPool.getComponent(newId);
-            if (!c) { cPool.addComponent(newId, Collider{}); c = cPool.getComponent(newId); }
-            deserializeCollider(*c, *d.collider);
-        }
-
-        if (d.hierarchy)
-        {
-            Hierarchy* h = hPool.getComponent(newId);
-            if (!h) { hPool.addComponent(newId, Hierarchy{}); h = hPool.getComponent(newId); }
-            deserializeHierarchy(*h, *d.hierarchy);
-        }
-
-        if (d.camera)
-        {
-            Camera* c = camPool.getComponent(newId);
-            if (!c) { camPool.addComponent(newId, Camera{}); c = camPool.getComponent(newId); }
-            deserializeCamera(*c, *d.camera);
-        }
-
-        if (d.script)
-        {
-            Script s;
-
-            deserializeScript(s, *d.script);
-
-            EntityReferenceData::remapFields
-            (
-                s.fields,
-                idMap
-            );
-
-            sPool.addComponent(newId, s);
-        }
-    }
-
-    for (const auto& d : entitiesData)
-    {
-        if (!d.hierarchy) continue;
-
-        EntityId newId = idMap[d.oldId];
         Hierarchy* h = hPool.getComponent(newId);
         if (!h || h->parent == INVALID_ENTITY) continue;
 
@@ -300,7 +182,57 @@ void SceneSerializer::deserializeWorld(IRenderAdapter& renderAdapter, World& wor
         }
     }
 
-    LOG_INFO("Scene loaded, entities: " + std::to_string(tPool.size()));
+    LOG_INFO("Scene loaded, entities: " + std::to_string(entitiesData.size()));
+}
+
+void SceneSerializer::deserializeEntity(
+    IRenderAdapter& renderAdapter,
+    World& world,
+    EntityId entity,
+    const nlohmann::json& ej,
+    const std::unordered_map<EntityId, EntityId>& idMap)
+{
+    // Adds the component if it is missing and fills it from json
+    auto apply = [&](const char* key, auto deserialize, auto component)
+        {
+            using T = decltype(component);
+            if (!ej.contains(key)) return;
+
+            auto& pool = world.getComponentPool<T>();
+            T* existing = pool.getComponent(entity);
+            if (!existing)
+            {
+                pool.addComponent(entity, component);
+                existing = pool.getComponent(entity);
+            }
+            deserialize(*existing, ej[key]);
+        };
+
+    apply("transform", &deserializeTransform, Transform{});
+    apply("tag", &deserializeTag, Tag{});
+    apply("light", &deserializeLight, Light{});
+    apply("mesh_renderer", [&](MeshRenderer& m, const nlohmann::json& mj) { deserializeMeshRenderer(renderAdapter, m, mj); }, MeshRenderer{});
+    apply("rigidbody", &deserializeRigidbody, Rigidbody{});
+    apply("collider", &deserializeCollider, Collider{});
+    apply("hierarchy", &deserializeHierarchy, Hierarchy{});
+    apply("camera", &deserializeCamera, Camera{});
+
+    if (ej.contains("script"))
+    {
+        Script s;
+        deserializeScript(s, ej["script"]);
+
+        // Ids of the source file are meaningless here: remap, unknown ones become null
+        EntityReferenceData::remapFields(s.fields, idMap);
+
+        world.getComponentPool<Script>().addComponent(entity, s);
+    }
+
+    if (ej.contains("prefab") && ej["prefab"].is_object())
+    {
+        world.getComponentPool<PrefabInstance>().addComponent(entity,
+            PrefabInstance{ ej["prefab"].value("name", "") });
+    }
 }
 
 nlohmann::json SceneSerializer::serializeTransform(const Transform& transform)

@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include "libs/imgui/imgui.h"
 #include "Entity.h"
+#include "Components/Script.h"
 #include "ComponentPool.h"
 #include "Logger.h"
 #include <Utils/Assets/AssetsUtils.h>
@@ -54,6 +55,7 @@ public:
     virtual void shutdownImGui() override;
 
     virtual void setSelectedEntity(EntityId entity) override { m_selectedEntity = entity; };
+    virtual void setPrefabLibrary(PrefabLibrary* library) override { m_prefabLibrary = library; }
 
     // Callbacks
     virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) override { m_onToggleDebugCallback = callback; }
@@ -164,6 +166,20 @@ private:
     // Asset Browser
     void assetBrowserNavigateUp();
 
+    // Prefabs
+    void renderPrefabPanel();
+    PrefabLibrary* m_prefabLibrary = nullptr;
+    std::vector<std::string> m_prefabNames;
+    bool m_prefabListDirty = true;
+    char m_prefabSaveName[128] = "";
+    EntityId m_prefabSaveNameEntity = INVALID_ENTITY;
+
+    // Template opened for field editing in the Prefabs panel
+    void renderPrefabFieldsEditor();
+    std::string m_editedPrefab;
+    Script m_editedPrefabScript;
+    bool m_editedPrefabDirty = false;
+
     World* m_world;
     bool m_isPlaying = false;
 
@@ -175,6 +191,7 @@ private:
     bool m_showLogPanel = true;
     bool m_showAbout = false;
     bool m_showAssetBrowser = true;
+    bool m_showPrefabs = true;
 
     bool m_showLoadScenePanel = false;
     bool m_showSaveAsScenePanel = false;

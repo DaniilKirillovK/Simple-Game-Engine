@@ -1,0 +1,68 @@
+{
+    "entity": {
+        "mesh_renderer": {
+            "material": {
+                "ambient_color": [
+                    0.20000000298023224,
+                    0.20000000298023224,
+                    0.20000000298023224,
+                    0.20000000298023224
+                ],
+                "diffuse_color": [
+                    0.30000001192092896,
+                    0.30000001192092896,
+                    0.3499999940395355,
+                    1.0
+                ],
+                "fragment_shader_path": "Shaders\\Default.frag",
+                "has_texture": false,
+                "shininess": 32.0,
+                "specular_color": [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "vertex_shader_path": "Shaders\\Default.vert"
+            },
+            "mesh": {
+                "type": "cube"
+            },
+            "render_layer": 0,
+            "visible": true
+        },
+        "script": {
+            "class": "PrefabSpawner",
+            "fields": {
+                "height": 6.0,
+                "interval": 0.75,
+                "lifetime": 0.0,
+                "max_alive": 8,
+                "prefab": "ball",
+                "spread": 4.0
+            },
+            "module": "prefab_spawner"
+        },
+        "tag": {
+            "name": "Ball Spawner"
+        },
+        "transform": {
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                0.4000000059604645,
+                0.4000000059604645,
+                0.4000000059604645
+            ]
+        }
+    },
+    "version": 1
+}
