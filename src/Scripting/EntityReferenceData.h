@@ -7,11 +7,12 @@
 #include <stdexcept>
 #include <unordered_map>
 
-namespace EntityReferenceData
+class EntityReferenceData
 {
+public:
     using Json = nlohmann::json;
 
-    inline bool isReference(const Json& value)
+    static bool isReference(const Json& value)
     {
         if (!value.is_object() ||
             value.size() != 1 ||
@@ -32,7 +33,7 @@ namespace EntityReferenceData
         return number > 0.0 && number <= static_cast<double>(std::numeric_limits<EntityId>::max());
     }
 
-    inline EntityId read(const Json& value)
+    static EntityId read(const Json& value)
     {
         if (value.is_null())
         {
@@ -47,7 +48,7 @@ namespace EntityReferenceData
         return value.at("$entity").get<EntityId>();
     }
 
-    inline Json make(EntityId id)
+    static Json make(EntityId id)
     {
         if (id == INVALID_ENTITY)
         {
@@ -60,7 +61,7 @@ namespace EntityReferenceData
         };
     }
 
-    inline void remapFields(
+    static void remapFields(
         Json& fields,
         const std::unordered_map<EntityId, EntityId>& idMap)
     {
@@ -92,4 +93,4 @@ namespace EntityReferenceData
             }
         }
     }
-}
+};

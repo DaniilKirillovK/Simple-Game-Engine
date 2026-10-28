@@ -20,7 +20,8 @@
 #include "tracy/Tracy.hpp"
 
 GameplayState::GameplayState(IRenderAdapter& renderer)
-: m_renderer(renderer)
+: m_renderer(renderer),
+  m_prefabs(std::make_unique<PrefabLibrary>(renderer))
 {
     setupEditorCallbacks();
 }
@@ -37,6 +38,9 @@ void GameplayState::onEnter()
     m_world->addSystem(std::make_unique<ScriptSystem>(
         [this](const std::string& primitive, const glm::vec3& position) {
             return spawnPrimitive(primitive, position);
+        },
+        [this](const std::string& prefab, const glm::vec3& position, const nlohmann::json& fieldOverrides) {
+            return m_prefabs->instantiate(*m_world, prefab, position, fieldOverrides);
         }));
     m_world->addSystem(std::make_unique<TransformSystem>());
     m_world->addSystem(std::make_unique<RenderSystem>(&m_renderer));
@@ -91,6 +95,8 @@ void GameplayState::setupEditorCallbacks()
     m_renderer.setOnCreateFromAssetCallback([this](Mesh* mesh, const std::string& path) {
         createFromAsset(mesh, path);
         });
+
+    m_renderer.setPrefabLibrary(m_prefabs.get());
 }
 
 void GameplayState::enterPlayMode()

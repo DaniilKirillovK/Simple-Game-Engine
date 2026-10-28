@@ -1,0 +1,42 @@
+{
+    "entity": {
+        "script": {
+            "class": "ArenaDirector",
+            "fields": {
+                "arena_half_size": 8.5,
+                "elite_every": 4,
+                "elite_prefab": "arena_enemy_fast",
+                "enemy_prefab": "arena_enemy",
+                "first_wave_size": 3,
+                "player_prefab": "arena_player",
+                "spawn_interval": 0.6,
+                "wave_growth": 2,
+                "wave_pause": 3.0,
+                "waves": 5,
+                "win_score": 0
+            },
+            "module": "arena_director"
+        },
+        "tag": {
+            "name": "Wave Director"
+        },
+        "transform": {
+            "position": [
+                0,
+                0,
+                0
+            ],
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "scale": [
+                1,
+                1,
+                1
+            ]
+        }
+    },
+    "version": 1
+}

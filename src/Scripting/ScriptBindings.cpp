@@ -13,6 +13,8 @@
 
 #include "Scripting/ScriptEngine.h"
 #include "Scripting/ScriptBehaviour.h"
+#include "Scripting/ScriptFields.h"
+#include "Scripting/EntityReferenceData.h"
 #include "Systems/ScriptSystem.h"
 #include "World.h"
 #include "InputHandler.h"
@@ -20,6 +22,9 @@
 #include "Components/Transform.h"
 #include "Components/Tag.h"
 #include "Components/Rigidbody.h"
+#include "Components/Hierarchy.h"
+
+#include <algorithm>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -143,6 +148,87 @@ std::vector<EntityHandle> findAll(const std::string& name)
 	return result;
 }
 
+// Proximity query: entities within radius, nearest first, optionally only with this tag name
+std::vector<EntityHandle> findInRadius(const glm::vec3& center, float radius, const std::string& name)
+{
+	World& world = activeWorld();
+	auto& transforms = world.getComponentPool<Transform>();
+
+	std::vector<std::pair<float, EntityId>> hits;
+	const float radiusSquared = radius * radius;
+
+	for (size_t i = 0; i < transforms.size(); ++i)
+	{
+		const EntityId entity = transforms.entities()[i];
+
+		if (!name.empty())
+		{
+			Tag* tag = world.getComponent<Tag>(entity);
+			if (!tag || tag->name != name) continue;
+		}
+
+		// Children: world matrix of the last frame; roots: position, fresh even right after a spawn
+		const Transform& transform = transforms.components()[i];
+		glm::vec3 position = transform.position;
+		Hierarchy* hierarchy = world.getComponent<Hierarchy>(entity);
+		if (hierarchy && hierarchy->parent != INVALID_ENTITY)
+		{
+			position = transform.getWorldPosition();
+		}
+
+		const glm::vec3 delta = position - center;
+		const float distanceSquared = glm::dot(delta, delta);
+		if (distanceSquared <= radiusSquared)
+		{
+			hits.emplace_back(distanceSquared, entity);
+		}
+	}
+
+	std::sort(hits.begin(), hits.end());
+
+	std::vector<EntityHandle> result;
+	result.reserve(hits.size());
+	for (const auto& [distanceSquared, entity] : hits)
+	{
+		result.push_back(EntityHandle{ entity });
+	}
+	return result;
+}
+
+// Field overrides for spawn_prefab: scalars as-is, engine.Entity as an entity reference
+nlohmann::json fieldsToJson(const py::object& fields)
+{
+	nlohmann::json result = nlohmann::json::object();
+	if (fields.is_none()) return result;
+
+	if (!py::isinstance<py::dict>(fields))
+	{
+		throw py::type_error("fields must be a dict or None");
+	}
+
+	for (auto item : fields.cast<py::dict>())
+	{
+		const std::string key = py::cast<std::string>(py::str(item.first));
+
+		if (py::isinstance<EntityHandle>(item.second))
+		{
+			const EntityHandle& entity = item.second.cast<const EntityHandle&>();
+			result[key] = isValid(entity) ? EntityReferenceData::make(entity.id) : nlohmann::json(nullptr);
+			continue;
+		}
+
+		try
+		{
+			result[key] = ScriptFields::pythonScalarToJson(item.second);
+		}
+		catch (const std::exception& e)
+		{
+			throw py::type_error("Field '" + key + "': " + e.what() + " or engine.Entity");
+		}
+	}
+	return result;
+}
+
 PYBIND11_EMBEDDED_MODULE(engine, m)
 {
 	m.doc() = "Simple Game Engine scripting API";
@@ -201,6 +287,13 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 		.def_property("velocity",
 			[](const EntityHandle& e) { return requireComponent<Rigidbody>(e, "Rigidbody").velocity; },
 			[](const EntityHandle& e, const glm::vec3& value) { requireComponent<Rigidbody>(e, "Rigidbody").velocity = value; })
+		.def_property_readonly("behaviour",
+			[](const EntityHandle& e) -> py::object
+			{
+				// Do not keep it across frames: after destroy its entity handle is invalid
+				if (!isValid(e)) return py::none();
+				return activeSystem().getBehaviour(e.id);
+			})
 		.def("destroy",
 			[](const EntityHandle& entity)
 			{
@@ -243,6 +336,18 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 			return EntityHandle{ entity };
 		}, "primitive"_a, "position"_a = glm::vec3(0.0f));
 
+	m.def("spawn_prefab", [](const std::string& name, const glm::vec3& position, const py::object& fields)
+		{
+			const nlohmann::json overrides = fieldsToJson(fields);
+			EntityId entity = activeSystem().spawnPrefab(name, position, overrides);
+			if (entity == INVALID_ENTITY)
+			{
+				throw std::runtime_error("Cannot spawn prefab '" + name + "', see the engine log");
+			}
+			return EntityHandle{ entity };
+		}, "name"_a, "position"_a = glm::vec3(0.0f), "fields"_a = py::none(),
+		"Spawns assets/prefabs/<name>.prefab.json. fields override the template's script fields.");
+
 	m.def(
 		"destroy",
 		[](const EntityHandle& entity)
@@ -261,6 +366,13 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 		}, "name"_a);
 
 	m.def("find_all", &findAll, "name"_a);
+
+	m.def("find_in_radius", &findInRadius, "center"_a, "radius"_a, "name"_a = "",
+		"Entities within radius of center, nearest first; name filters by tag");
+
+	m.def("hud", [](const std::string& key, const std::string& text) { activeSystem().setHudLine(key, text); },
+		"key"_a, "text"_a, "Shows a HUD line over the viewport until Stop; lines are ordered by key");
+	m.def("hud_clear", [](const std::string& key) { activeSystem().clearHud(key); }, "key"_a = "");
 
 	m.def(
 		"current_session_id",

@@ -12,8 +12,9 @@
 
 namespace py = pybind11;
 
-ScriptSystem::ScriptSystem(SpawnFunction spawnFunction)
-	: m_spawnFunction(std::move(spawnFunction))
+ScriptSystem::ScriptSystem(SpawnFunction spawnFunction, PrefabSpawnFunction prefabSpawnFunction)
+	: m_spawnFunction(std::move(spawnFunction)),
+	m_prefabSpawnFunction(std::move(prefabSpawnFunction))
 {
 }
 
@@ -41,6 +42,9 @@ void ScriptSystem::update(World& world, float deltaTime)
 	if (!m_running || !m_isEnabled) return;
 
 	m_world = &world;
+
+	// Leftovers spawned from on_destroy last frame must start before they update
+	flushPendingStarts();
 
 	std::vector<EntityId> entities;
 	entities.reserve(m_behaviours.size());
@@ -73,6 +77,7 @@ void ScriptSystem::update(World& world, float deltaTime)
 		}
 	}
 
+	flushPendingStarts();
 	flushDestroyQueue();
 }
 
@@ -129,6 +134,7 @@ void ScriptSystem::start(World& world)
 		}
 	}
 
+	flushPendingStarts();
 	flushDestroyQueue();
 
 	LOG_INFO("Scripts started: " + std::to_string(m_behaviours.size()) + " behaviour(s)");
@@ -150,6 +156,8 @@ void ScriptSystem::stop()
 
 	m_behaviours.clear();
 	m_destroyQueue.clear();
+	m_pendingStarts.clear();
+	m_hud.clear();
 	m_running = false;
 	m_world = nullptr;
 
@@ -166,6 +174,81 @@ EntityId ScriptSystem::spawn(const std::string& primitive, const glm::vec3& posi
 {
 	if (!m_spawnFunction) return INVALID_ENTITY;
 	return m_spawnFunction(primitive, position);
+}
+
+EntityId ScriptSystem::spawnPrefab(const std::string& prefab, const glm::vec3& position,
+	const nlohmann::json& fieldOverrides)
+{
+	if (!m_prefabSpawnFunction) return INVALID_ENTITY;
+
+	EntityId entity = m_prefabSpawnFunction(prefab, position, fieldOverrides);
+	if (entity != INVALID_ENTITY && m_running)
+	{
+		activateSpawned(entity);
+	}
+	return entity;
+}
+
+void ScriptSystem::activateSpawned(EntityId entity)
+{
+	Script* script = m_world->getComponent<Script>(entity);
+	if (!script) return;
+
+	// Copy: the behaviour constructor may spawn too and reallocate the Script pool
+	const Script scriptCopy = *script;
+	createBehaviour(entity, scriptCopy);
+
+	if (m_behaviours.count(entity))
+	{
+		m_pendingStarts.push_back(entity);
+	}
+}
+
+void ScriptSystem::flushPendingStarts()
+{
+	// on_start may spawn again. Rounds are capped so a script that spawns from every
+	// on_start cannot hang the frame: the rest waits for the next frame
+	constexpr int MAX_START_ROUNDS = 16;
+	for (int round = 0; round < MAX_START_ROUNDS && !m_pendingStarts.empty(); ++round)
+	{
+		std::vector<EntityId> pending = std::move(m_pendingStarts);
+		m_pendingStarts.clear();
+
+		for (EntityId entity : pending)
+		{
+			auto it = m_behaviours.find(entity);
+			if (it == m_behaviours.end()) continue;
+
+			py::object behaviour = it->second;
+			try
+			{
+				behaviour.cast<ScriptBehaviour*>()->onStart();
+			}
+			catch (const std::exception& e)
+			{
+				ScriptEngine::logPythonError("on_start of spawned entity " + std::to_string(entity) + " failed", e);
+				m_behaviours.erase(entity);
+			}
+		}
+	}
+}
+
+py::object ScriptSystem::getBehaviour(EntityId entity) const
+{
+	auto it = m_behaviours.find(entity);
+	return it != m_behaviours.end() ? it->second : py::none();
+}
+
+void ScriptSystem::clearHud(const std::string& key)
+{
+	if (key.empty())
+	{
+		m_hud.clear();
+	}
+	else
+	{
+		m_hud.erase(key);
+	}
 }
 
 void ScriptSystem::requestDestroy(EntityId entity)

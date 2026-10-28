@@ -12,6 +12,7 @@ class Light;
 struct TextureData;
 struct ShaderProgram;
 class World;
+class PrefabLibrary;
 
 struct Color 
 {
@@ -92,4 +93,7 @@ public:
     virtual void setOnCreateFromAssetCallback(std::function<void(Mesh*, const std::string&)> callback) = 0;
 
     virtual void setSelectedEntity(EntityId entity) = 0;
+
+    // Editor: prefab list, instantiate into the scene, save selection as a template
+    virtual void setPrefabLibrary(PrefabLibrary* library) = 0;
 };

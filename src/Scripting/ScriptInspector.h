@@ -10,13 +10,15 @@
 #include "libs/imgui/imgui.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
 
-namespace ScriptInspector
+class ScriptInspector
 {
-    inline std::string entityLabel(
+public:
+    static std::string entityLabel(
         World& world,
         EntityId id)
     {
@@ -33,7 +35,7 @@ namespace ScriptInspector
         return name + " (id: " + std::to_string(id) + ")";
     }
 
-    inline bool drawEntityField(
+    static bool drawEntityField(
         const ScriptFields::Field& field,
         ScriptFields::Json& value,
         World& world)
@@ -109,12 +111,12 @@ namespace ScriptInspector
         return changed;
     }
 
-    inline bool drawField(
+    static bool drawField(
         const ScriptFields::Field& field,
         ScriptFields::Json& value,
         World& world)
     {
-        using ScriptFields::Type;
+        using Type = ScriptFields::Type;
 
         const char* label = field.label.c_str();
 
@@ -290,25 +292,56 @@ namespace ScriptInspector
         return false;
     }
 
-    inline void draw(Script& script, World& world)
+    struct DrawOptions
     {
-        if (!ImGui::CollapsingHeader(
-            "Script",
-            ImGuiTreeNodeFlags_DefaultOpen))
+        // Template field values: fields that differ get a marker, Reset returns to them
+        const ScriptFields::Json* baseline = nullptr;
+
+        // Prefab files cannot reference scene entities
+        bool allowEntityReferences = true;
+    };
+
+    static bool sameValue(const ScriptFields::Json& a, const ScriptFields::Json& b)
+    {
+        if (a.is_number() && b.is_number())
         {
-            return;
+            // Values pass through float in the widgets, so compare with a tolerance
+            const double x = a.get<double>();
+            const double y = b.get<double>();
+            return std::abs(x - y) <= 1e-5 * std::max(1.0, std::max(std::abs(x), std::abs(y)));
+        }
+        return a == b;
+    }
+
+    static ScriptFields::Json baselineValue(
+        const ScriptFields::Field& field,
+        const DrawOptions& options)
+    {
+        if (options.baseline &&
+            options.baseline->is_object() &&
+            options.baseline->contains(field.name))
+        {
+            return options.baseline->at(field.name);
         }
 
-        ImGui::Text("Module: %s", script.moduleName.c_str());
-        ImGui::Text("Class: %s", script.className.c_str());
+        return field.defaultValue;
+    }
 
+    // Editable fields of the behaviour, edits go to script.fields. Returns true on change.
+    static bool drawFields(
+        Script& script,
+        World& world,
+        const DrawOptions& options = {})
+    {
         ScriptEngine& engine = ScriptEngine::getInstance();
 
         if (!engine.isInitialized())
         {
             ImGui::TextWrapped("Python is not initialized.");
-            return;
+            return false;
         }
+
+        bool anyChanged = false;
 
         try
         {
@@ -322,7 +355,7 @@ namespace ScriptInspector
             if (behaviourClass.is_none())
             {
                 ImGui::TextWrapped("Cannot load behaviour. Check the engine log.");
-                return;
+                return false;
             }
 
             const std::vector<ScriptFields::Field> schema = ScriptFields::readSchema(behaviourClass);
@@ -330,7 +363,7 @@ namespace ScriptInspector
             if (schema.empty())
             {
                 ImGui::TextWrapped("This behaviour declares no editable fields.");
-                return;
+                return false;
             }
 
             if (!script.fields.is_object())
@@ -340,16 +373,25 @@ namespace ScriptInspector
                 if (ImGui::Button("Reset all fields"))
                 {
                     script.fields = ScriptFields::Json::object();
+                    return true;
                 }
 
-                return;
+                return false;
             }
 
             for (const ScriptFields::Field& field : schema)
             {
                 ImGui::PushID(field.name.c_str());
 
+                if (field.type == ScriptFields::Type::Entity && !options.allowEntityReferences)
+                {
+                    ImGui::TextDisabled("%s: set per scene object, not in a prefab", field.label.c_str());
+                    ImGui::PopID();
+                    continue;
+                }
+
                 ScriptFields::Json value = ScriptFields::effectiveValue(script, field);
+                const ScriptFields::Json resetValue = baselineValue(field, options);
 
                 const std::string error = ScriptFields::validationError(field, value);
 
@@ -362,9 +404,10 @@ namespace ScriptInspector
                         error.c_str()
                     );
 
-                    if (ImGui::Button("Reset to default"))
+                    if (ImGui::Button("Reset"))
                     {
-                        script.fields[field.name] = field.defaultValue;
+                        script.fields[field.name] = resetValue;
+                        anyChanged = true;
                     }
 
                     ImGui::PopID();
@@ -380,6 +423,7 @@ namespace ScriptInspector
                     if (editedError.empty())
                     {
                         script.fields[field.name] = value;
+                        anyChanged = true;
                     }
                     else
                     {
@@ -395,7 +439,20 @@ namespace ScriptInspector
 
                 if (ImGui::SmallButton("Reset"))
                 {
-                    script.fields[field.name] = field.defaultValue;
+                    script.fields[field.name] = resetValue;
+                    anyChanged = true;
+                }
+
+                if (options.baseline &&
+                    !sameValue(ScriptFields::effectiveValue(script, field), resetValue))
+                {
+                    ImGui::SameLine();
+                    ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "*");
+
+                    if (ImGui::IsItemHovered())
+                    {
+                        ImGui::SetTooltip("Differs from prefab: %s", resetValue.dump().c_str());
+                    }
                 }
 
                 ImGui::PopID();
@@ -409,5 +466,25 @@ namespace ScriptInspector
                 e.what()
             );
         }
+
+        return anyChanged;
     }
-}
+
+    static bool draw(
+        Script& script,
+        World& world,
+        const DrawOptions& options = {})
+    {
+        if (!ImGui::CollapsingHeader(
+            "Script",
+            ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            return false;
+        }
+
+        ImGui::Text("Module: %s", script.moduleName.c_str());
+        ImGui::Text("Class: %s", script.className.c_str());
+
+        return drawFields(script, world, options);
+    }
+};
