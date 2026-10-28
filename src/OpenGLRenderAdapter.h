@@ -15,7 +15,7 @@
 class Transform;
 class Hierarchy;
 class Texture;
-class Mesh;
+struct Mesh;
 
 struct DebugVertex
 {
@@ -65,7 +65,7 @@ public:
     virtual void setOnCreateCubeCallback(std::function<void()> callback) override { m_onCreateCubeCallback = callback; }
     virtual void setOnCreateSphereCallback(std::function<void()> callback) override { m_onCreateSphereCallback = callback; }
     virtual void setOnCreateEmptyCallback(std::function<void()> callback) override { m_onCreateEmptyCallback = callback; }
-    virtual void setOnCreateFromAssetCallback(std::function<void(Mesh*, const std::string&)> callback) override { m_onCreateFromAssetCallback = callback; }
+    virtual void setOnCreateFromAssetCallback(std::function<void(std::shared_ptr<Mesh>, const std::string&)> callback) override { m_onCreateFromAssetCallback = callback; }
 
 private:
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -111,7 +111,7 @@ private:
     std::function<void()> m_onCreateCubeCallback;
     std::function<void()> m_onCreateSphereCallback;
     std::function<void()> m_onCreateEmptyCallback;
-    std::function<void(Mesh*, const std::string&)> m_onCreateFromAssetCallback;
+    std::function<void(std::shared_ptr<Mesh>, const std::string&)> m_onCreateFromAssetCallback;
 
     void createRenderTexture(int width, int height);
     void beginRenderToTexture();
@@ -140,6 +140,12 @@ private:
 
     void renderHierarchyNode(ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth);
 
+    // Entity deletion: requested from the UI, applied after all panels are drawn
+    bool canDeleteEntity(EntityId entity) const;
+    void requestDeleteEntity(EntityId entity);
+    void applyPendingDelete();
+    EntityId m_pendingDeleteEntity = INVALID_ENTITY;
+
     bool initGLFW(int width, int height);
     bool initGLAD();
     void setupOpenGLState();
@@ -149,6 +155,9 @@ private:
     void updateProjectionMatrix();
 
     void createMeshVAO(Mesh* mesh);
+    // Called from ~Mesh through Mesh::gpuReleaseHook
+    static void releaseMeshBuffersHook(void* context, Mesh* mesh);
+    void releaseMeshBuffers(Mesh* mesh);
 
     void setupDebugBuffers();
     void flushDebugDraw();
@@ -258,7 +267,7 @@ private:
     std::string m_currentAssetPath = "";
     ImTextureID m_folderIcon = nullptr;
     ImTextureID m_modelIcon = nullptr;
-    Mesh* m_selectedMesh = nullptr;
+    std::shared_ptr<Mesh> m_selectedMesh;
     Texture* m_selectedTexture = nullptr;
 
     ImVec2 m_viewportSize = ImVec2(0, 0);

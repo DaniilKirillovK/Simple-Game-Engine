@@ -499,7 +499,8 @@ void SceneSerializer::deserializeMeshRenderer(IRenderAdapter& renderAdapter, Mes
             auto meshResource = AssetLoader::getInstance().requestMesh(meshPath);
             if (meshResource && meshResource->isValid())
             {
-                renderer.mesh = meshResource->get();
+                // Aliasing pointer: the Resource stays alive while any renderer uses its mesh
+                renderer.mesh = std::shared_ptr<Mesh>(meshResource, meshResource->get());
                 LOG_INFO("Requested mesh: " + meshPath);
             }
             else
@@ -567,9 +568,9 @@ void SceneSerializer::deserializeMeshRenderer(IRenderAdapter& renderAdapter, Mes
             return;
         }
 
-        Material* material = new Material{
+        auto material = std::make_shared<Material>(
             diffuseColor, vertShader, fragShader, renderAdapter
-        };
+        );
 
         if (mat.contains("has_texture") && mat["has_texture"].get<bool>()) 
         {
@@ -586,7 +587,7 @@ void SceneSerializer::deserializeMeshRenderer(IRenderAdapter& renderAdapter, Mes
             }
         }
 
-        renderer.material = material;
+        renderer.material = std::move(material);
     }
 }
 
@@ -657,7 +658,7 @@ void SceneSerializer::deserializeCamera(Camera& camera, const nlohmann::json& j)
     if (j.contains("is_active")) camera.isActive = j["is_active"].get<bool>();
 }
 
-Mesh* SceneSerializer::createPrimitiveMesh(const nlohmann::json& meshJson)
+std::shared_ptr<Mesh> SceneSerializer::createPrimitiveMesh(const nlohmann::json& meshJson)
 {
     std::string type = meshJson["type"].get<std::string>();
 

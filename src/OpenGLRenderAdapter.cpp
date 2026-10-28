@@ -104,6 +104,9 @@ bool OpenGLRenderAdapter::initialize(int width, int height)
     setupDebugBuffers();
     createDebugShader();
 
+    Mesh::gpuReleaseHook = &OpenGLRenderAdapter::releaseMeshBuffersHook;
+    Mesh::gpuReleaseContext = this;
+
     std::string openGLVersion = reinterpret_cast<const char *>(glGetString(GL_VERSION));
     std::string openGLRenderer = reinterpret_cast<const char *>(glGetString(GL_VERSION));
     LOG_INFO("OpenGL version: " + openGLVersion);
@@ -161,10 +164,15 @@ void OpenGLRenderAdapter::shutdown()
     meshVBOs.clear();
     meshEBOs.clear();
 
-    if (m_shaderProgram->programId)
+    // Meshes still alive (resource cache, leaked worlds) must not call into a dead context
+    if (Mesh::gpuReleaseContext == this)
     {
-        glDeleteProgram(m_shaderProgram->programId);
+        Mesh::gpuReleaseHook = nullptr;
+        Mesh::gpuReleaseContext = nullptr;
     }
+
+    // Programs belong to their materials; this is only the last one bound
+    m_shaderProgram = nullptr;
 
     shutdownImGui();
 
@@ -671,6 +679,55 @@ void OpenGLRenderAdapter::renderUI()
     if (m_showLogPanel) renderLogPanel();
     if (m_showAssetBrowser) renderAssetBrowser();
     if (m_showPrefabs) renderPrefabPanel();
+
+    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false))
+    {
+        requestDeleteEntity(m_selectedEntity);
+    }
+
+    applyPendingDelete();
+}
+
+bool OpenGLRenderAdapter::canDeleteEntity(EntityId entity) const
+{
+    // Play mode restores the scene on Stop, and scripts may hold the entity
+    return !m_isPlaying && m_world && entity != INVALID_ENTITY && m_world->isValidEntity(entity);
+}
+
+void OpenGLRenderAdapter::requestDeleteEntity(EntityId entity)
+{
+    if (canDeleteEntity(entity))
+    {
+        m_pendingDeleteEntity = entity;
+    }
+}
+
+void OpenGLRenderAdapter::applyPendingDelete()
+{
+    const EntityId entity = m_pendingDeleteEntity;
+    m_pendingDeleteEntity = INVALID_ENTITY;
+
+    if (!canDeleteEntity(entity)) return;
+
+    std::string name = "Entity " + std::to_string(entity);
+    if (Tag* tag = m_world->getComponent<Tag>(entity))
+    {
+        if (!tag->name.empty()) name = tag->name;
+    }
+
+    HierarchyUtils::destroyRecursive(m_world, entity);
+
+    // The selection may have been the entity or one of its children; -1 is "nothing selected" in the editor
+    if (!m_world->isValidEntity(m_selectedEntity))
+    {
+        m_selectedEntity = -1;
+    }
+    if (!m_world->isValidEntity(m_prefabSaveNameEntity))
+    {
+        m_prefabSaveNameEntity = INVALID_ENTITY;
+    }
+
+    LOG_INFO("Deleted entity: " + name + " (id: " + std::to_string(entity) + ")");
 }
 
 void OpenGLRenderAdapter::renderPrefabFieldsEditor()
@@ -1008,6 +1065,13 @@ void OpenGLRenderAdapter::renderInspector()
     ImGui::Text("Entity ID: %d", m_selectedEntity);
     ImGui::SameLine();
 
+    ImGui::BeginDisabled(!canDeleteEntity(m_selectedEntity));
+    if (ImGui::SmallButton("Delete Entity"))
+    {
+        requestDeleteEntity(m_selectedEntity);
+    }
+    ImGui::EndDisabled();
+
     ImGui::Separator();
 
     if (Transform* transform = m_world->getComponent<Transform>(m_selectedEntity))
@@ -1228,14 +1292,14 @@ void OpenGLRenderAdapter::renderInspector()
                 auto vertShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
                 auto fragShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
 
-                Mesh* cubeMesh = MeshFactory::createCube();
+                auto cubeMesh = MeshFactory::createCube();
 
-                Material* defaultMaterial = new Material{
+                auto defaultMaterial = std::make_shared<Material>(
                     glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
                     vertShader->get(),
                     fragShader->get(),
                     *this
-                };
+                );
 
                 m_world->getComponentPool<MeshRenderer>().addComponent(m_selectedEntity, MeshRenderer{ cubeMesh, defaultMaterial });
             }
@@ -1450,6 +1514,16 @@ void OpenGLRenderAdapter::renderMainMenuBar()
             {
                 if (m_autoSaveEnabled) saveCurrentScene();
                 glfwSetWindowShouldClose(m_window, true);
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Edit"))
+        {
+            if (ImGui::MenuItem("Delete Selected", "Del", false, canDeleteEntity(m_selectedEntity)))
+            {
+                requestDeleteEntity(m_selectedEntity);
             }
 
             ImGui::EndMenu();
@@ -1881,7 +1955,8 @@ void OpenGLRenderAdapter::renderAssetBrowser()
                     auto meshResource = AssetLoader::getInstance().requestMesh(asset.path);
                     if (meshResource && meshResource->isValid())
                     {
-                        m_selectedMesh = meshResource->get();
+                        // Aliasing pointer: keeps the cached Resource alive while the mesh is used
+                        m_selectedMesh = std::shared_ptr<Mesh>(meshResource, meshResource->get());
                     }
                 }
             }
@@ -2079,6 +2154,22 @@ void OpenGLRenderAdapter::renderHierarchyNode(ComponentPool<Hierarchy>& hierarch
         m_selectedEntity = entity;
     }
 
+    if (ImGui::BeginPopupContextItem("EntityContextMenu"))
+    {
+        m_selectedEntity = entity;
+
+        if (ImGui::MenuItem("Delete", "Del", false, canDeleteEntity(entity)))
+        {
+            requestDeleteEntity(entity);
+        }
+        if (hasChildren && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            ImGui::SetTooltip("Children are deleted too");
+        }
+
+        ImGui::EndPopup();
+    }
+
     if (hasChildren && isOpen)
     {
         for (EntityId child : children)
@@ -2240,6 +2331,36 @@ void OpenGLRenderAdapter::createMeshVAO(Mesh *mesh)
     meshVAOs[mesh] = VAO;
     meshVBOs[mesh] = VBO;
     meshEBOs[mesh] = EBO;
+
+    // Marks the mesh as having GPU buffers, so its destructor asks to free them
+    mesh->VAO = VAO;
+    mesh->VBO = VBO;
+    mesh->EBO = EBO;
+}
+
+void OpenGLRenderAdapter::releaseMeshBuffersHook(void* context, Mesh* mesh)
+{
+    static_cast<OpenGLRenderAdapter*>(context)->releaseMeshBuffers(mesh);
+}
+
+void OpenGLRenderAdapter::releaseMeshBuffers(Mesh* mesh)
+{
+    // Erase the keys too: a new mesh allocated at this address must get its own buffers
+    if (auto it = meshVAOs.find(mesh); it != meshVAOs.end())
+    {
+        glDeleteVertexArrays(1, &it->second);
+        meshVAOs.erase(it);
+    }
+    if (auto it = meshVBOs.find(mesh); it != meshVBOs.end())
+    {
+        glDeleteBuffers(1, &it->second);
+        meshVBOs.erase(it);
+    }
+    if (auto it = meshEBOs.find(mesh); it != meshEBOs.end())
+    {
+        glDeleteBuffers(1, &it->second);
+        meshEBOs.erase(it);
+    }
 }
 
 void OpenGLRenderAdapter::setupDebugBuffers()

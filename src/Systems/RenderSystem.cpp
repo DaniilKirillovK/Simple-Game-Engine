@@ -88,8 +88,8 @@ void RenderSystem::update(World& world, float deltaTime)
         m_renderAdapter->setNormalMatrix(glm::value_ptr(normalMatrix));
 
         m_renderAdapter->setLights(m_lights);
-        m_renderAdapter->setMaterial(r.material);
-        m_renderAdapter->drawMesh(r.mesh);
+        m_renderAdapter->setMaterial(r.material.get());
+        m_renderAdapter->drawMesh(r.mesh.get());
     }
 }
 

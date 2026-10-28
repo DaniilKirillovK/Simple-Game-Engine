@@ -2,14 +2,15 @@
 #include "Component.h"
 #include <vector>
 #include <cmath>
+#include <memory>
 #include "Components/MeshRenderer.h"
 
 class MeshFactory 
 {
 public:
-    static Mesh* createCube() 
+    static std::shared_ptr<Mesh> createCube() 
     {
-        Mesh* mesh = new Mesh();
+        auto mesh = std::make_shared<Mesh>();
         mesh->type = MeshType::Cube;
 
         std::vector<glm::vec3> vertices;
@@ -104,9 +105,9 @@ public:
         return mesh;
     }
 
-    static Mesh* createSphere(float radius, int sectors, int stacks) 
+    static std::shared_ptr<Mesh> createSphere(float radius, int sectors, int stacks) 
     {
-        Mesh* mesh = new Mesh();
+        auto mesh = std::make_shared<Mesh>();
         mesh->type = MeshType::Sphere;
 
         std::vector<glm::vec3> vertices;
@@ -172,9 +173,9 @@ public:
         return mesh;
     }
 
-    static Mesh* createPlane(float size) 
+    static std::shared_ptr<Mesh> createPlane(float size) 
     {
-        Mesh* mesh = new Mesh();
+        auto mesh = std::make_shared<Mesh>();
         mesh->type = MeshType::Plane;
 
         float half = size / 2.0f;

@@ -52,5 +52,5 @@ public:
     static void deserializeScript(Script& script, const nlohmann::json& j);
 
 private:
-    static Mesh* createPrimitiveMesh(const nlohmann::json& meshJson);
+    static std::shared_ptr<Mesh> createPrimitiveMesh(const nlohmann::json& meshJson);
 };

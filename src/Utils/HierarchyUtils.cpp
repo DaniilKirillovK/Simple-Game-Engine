@@ -86,3 +86,18 @@ void HierarchyUtils::markChildrenDirty(World* world, EntityId entity)
         }
     }
 }
+
+void HierarchyUtils::destroyRecursive(World* world, EntityId entity)
+{
+    if (!world->isValidEntity(entity)) return;
+
+    removeFromParent(world, entity);
+
+    // Copy: destroying a child detaches it and edits this list
+    for (EntityId child : getChildren(world, entity))
+    {
+        destroyRecursive(world, child);
+    }
+
+    world->destroyEntity(entity);
+}

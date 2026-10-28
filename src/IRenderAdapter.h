@@ -1,13 +1,15 @@
 #pragma once
 #include <string>
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <glm/glm.hpp>
 #include "InputHandler.h"
 #include "Resources/ShaderLoader/ShaderProgram.h"
 #include "Entity.h"
 
 class Material;
-class Mesh;
+struct Mesh;
 class Light;
 struct TextureData;
 struct ShaderProgram;
@@ -90,7 +92,7 @@ public:
     virtual void setOnCreateCubeCallback(std::function<void()> callback) = 0;
     virtual void setOnCreateSphereCallback(std::function<void()> callback) = 0;
     virtual void setOnCreateEmptyCallback(std::function<void()> callback) = 0;
-    virtual void setOnCreateFromAssetCallback(std::function<void(Mesh*, const std::string&)> callback) = 0;
+    virtual void setOnCreateFromAssetCallback(std::function<void(std::shared_ptr<Mesh>, const std::string&)> callback) = 0;
 
     virtual void setSelectedEntity(EntityId entity) = 0;
 

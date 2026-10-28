@@ -11,4 +11,6 @@ public:
     static std::vector<EntityId> getChildren(World* world, EntityId entity);
     static EntityId getParent(World* world, EntityId entity);
     static void markChildrenDirty(World* world, EntityId entity);
+    // Detaches the entity from its parent and destroys it together with all descendants
+    static void destroyRecursive(World* world, EntityId entity);
 };

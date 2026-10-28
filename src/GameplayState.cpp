@@ -92,7 +92,7 @@ void GameplayState::setupEditorCallbacks()
         createSphereEntity();
         });
 
-    m_renderer.setOnCreateFromAssetCallback([this](Mesh* mesh, const std::string& path) {
+    m_renderer.setOnCreateFromAssetCallback([this](std::shared_ptr<Mesh> mesh, const std::string& path) {
         createFromAsset(mesh, path);
         });
 
@@ -191,7 +191,7 @@ void GameplayState::createSphereEntity()
     if (e != INVALID_ENTITY) m_renderer.setSelectedEntity(e);
 }
 
-void GameplayState::createFromAsset(Mesh* mesh, const std::string& path)
+void GameplayState::createFromAsset(std::shared_ptr<Mesh> mesh, const std::string& path)
 {
     if (!mesh) return;
     std::string name = std::filesystem::path(path).stem().string();
@@ -199,7 +199,7 @@ void GameplayState::createFromAsset(Mesh* mesh, const std::string& path)
     if (e != INVALID_ENTITY) m_renderer.setSelectedEntity(e);
 }
 
-EntityId GameplayState::createMeshEntity(Mesh* mesh, const std::string& tagName, const glm::vec4& color, bool withPhysics)
+EntityId GameplayState::createMeshEntity(std::shared_ptr<Mesh> mesh, const std::string& tagName, const glm::vec4& color, bool withPhysics)
 {
     if (!mesh) return INVALID_ENTITY;
 
@@ -208,12 +208,12 @@ EntityId GameplayState::createMeshEntity(Mesh* mesh, const std::string& tagName,
 
     if (!vertShader || !fragShader) return INVALID_ENTITY;
 
-    Material* material = new Material{
+    auto material = std::make_shared<Material>(
         color,
         vertShader->get(),
         fragShader->get(),
         m_renderer
-    };
+    );
 
     const EntityId e = m_world->createEntity();
 
@@ -224,7 +224,7 @@ EntityId GameplayState::createMeshEntity(Mesh* mesh, const std::string& tagName,
     auto& cPool = m_world->getComponentPool<Collider>();
 
     tPool.addComponent(e, Transform{});
-    mrPool.addComponent(e, MeshRenderer{ mesh, material });
+    mrPool.addComponent(e, MeshRenderer{ std::move(mesh), std::move(material) });
     tagPool.addComponent(e, Tag{ tagName });
 
     if (withPhysics)

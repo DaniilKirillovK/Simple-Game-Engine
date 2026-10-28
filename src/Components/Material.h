@@ -53,6 +53,21 @@ public:
         shaderProgram->uniforms = uniforms;
     }
 
+    // Owns its linked program: copies would free it twice
+    Material(const Material&) = delete;
+    Material& operator=(const Material&) = delete;
+
+    ~Material()
+    {
+        if (!shaderProgram) return;
+
+        if (shaderProgram->programId)
+        {
+            glDeleteProgram(shaderProgram->programId);
+        }
+        delete shaderProgram;
+    }
+
     glm::vec4 diffuseColor = glm::vec4(1.0f);
     glm::vec4 specularColor = glm::vec4(0.5f);
     glm::vec4 ambientColor = glm::vec4(0.2f);

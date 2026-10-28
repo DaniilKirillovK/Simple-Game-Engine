@@ -32,9 +32,9 @@ private:
     void createEmptyEntity();
     void createCubeEntity();
     void createSphereEntity();
-    void createFromAsset(Mesh* mesh, const std::string& path);
+    void createFromAsset(std::shared_ptr<Mesh> mesh, const std::string& path);
 
-    EntityId createMeshEntity(Mesh* mesh, const std::string& tagName,
+    EntityId createMeshEntity(std::shared_ptr<Mesh> mesh, const std::string& tagName,
         const glm::vec4& color, bool withPhysics);
 
     EntityId spawnPrimitive(const std::string& primitive, const glm::vec3& position);
