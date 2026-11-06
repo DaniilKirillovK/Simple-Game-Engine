@@ -7,7 +7,8 @@
 #include "Entity.h"
 #include "World.h"
 #include "Components/Light.h"
-#include <glm/gtc/type_ptr.hpp> 
+#include "Scripting/ScriptGilWindow.h"
+#include <glm/gtc/type_ptr.hpp>
 
 #include "tracy/Tracy.hpp"
 
@@ -19,6 +20,8 @@ RenderSystem::RenderSystem(IRenderAdapter* renderAdapter)
 void RenderSystem::update(World& world, float deltaTime)
 {
     ZoneScopedN("RenderSystem::update");
+
+    ScriptGilWindow gilWindow;
 
     if (!m_isEnabled || !m_renderAdapter) return;
 

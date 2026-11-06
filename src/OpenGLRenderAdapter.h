@@ -10,6 +10,7 @@
 #include "Components/Script.h"
 #include "ComponentPool.h"
 #include "Logger.h"
+#include "Scripting/ScriptConsole.h"
 #include <Utils/Assets/AssetsUtils.h>
 
 class Transform;
@@ -121,12 +122,23 @@ private:
 
     void renderUI();
     void renderUIViewport();
+    void selectEntityAt(ImVec2 imagePos, ImVec2 imageSize);
+    void applyCursorLock();
+    void drawCrosshair(ImVec2 imagePos, ImVec2 imageSize);
+    void drawScreenFlash(const glm::vec3& color, float alpha, ImVec2 imagePos, ImVec2 imageSize);
+    void drawCenterMessage(const std::string& message, ImVec2 imagePos, ImVec2 imageSize);
+    bool m_cursorLockApplied = false;
+    bool m_stopRequested = false;
     void renderSceneHierarchy();
     void renderInspector();
     void renderStatistics();
     void renderTransformEditor(Transform& transform);
     void renderToolbar(ImVec2 position, ImVec2 size);
+    static constexpr float TOOLBAR_OFFSET = 20.0f;
+    static constexpr float TOOLBAR_HEIGHT = 40.0f;
     void renderLogPanel();
+    void renderScriptConsole();
+    static int scriptConsoleInputCallback(ImGuiInputTextCallbackData* data);
     void renderAssetBrowser();
 
     void renderMainMenuBar();
@@ -169,7 +181,7 @@ private:
     void saveCurrentScene();
     void loadLastScene();
     void setAutoSaveEnabled(bool enabled) { m_autoSaveEnabled = enabled; }
-    std::string m_currentScenePath = "assets\\scenes\\test_scene.json";
+    std::string m_currentScenePath = "assets\\scenes\\lava_platformer.json";
     bool m_autoSaveEnabled = true;
 
     // Asset Browser
@@ -198,6 +210,7 @@ private:
     bool m_showStatistics = true;
     bool m_showViewport = true;
     bool m_showLogPanel = true;
+    bool m_showScriptConsole = true;
     bool m_showAbout = false;
     bool m_showAssetBrowser = true;
     bool m_showPrefabs = true;
@@ -256,6 +269,16 @@ private:
     std::mutex m_logMutex;
     int m_maxLogEntries = 2000;
     bool m_autoScrollLogs = true;
+
+    ScriptConsole m_scriptConsole;
+    char m_scriptConsoleInput[1024] = "";
+    int m_scriptConsoleHistoryPos = -1;
+    bool m_scriptConsoleScrollToBottom = false;
+    bool m_scriptConsoleFocused = false;
+    int m_scriptConsoleFocusChange = 0;
+    bool m_consoleToggleRequested = false;
+    bool m_relockCursorAfterConsole = false;
+    void toggleScriptConsoleFocus();
     bool m_showInfo = true;
     bool m_showWarning = true;
     bool m_showError = true;

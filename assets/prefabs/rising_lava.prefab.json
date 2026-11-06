@@ -1,0 +1,68 @@
+{
+    "version": 1,
+    "entity": {
+        "tag": {
+            "name": "Lava"
+        },
+        "transform": {
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                10.0,
+                1.0,
+                10.0
+            ]
+        },
+        "script": {
+            "module": "rising_lava",
+            "class": "RisingLava",
+            "fields": {
+                "start_delay": 10.0,
+                "rise_speed": 0.2,
+                "acceleration": 0.004,
+                "max_height": 20.0,
+                "instant_kill": true,
+                "damage_per_second": 60
+            }
+        },
+        "mesh_renderer": {
+            "mesh": {
+                "type": "cube"
+            },
+            "material": {
+                "diffuse_color": [
+                    1.0,
+                    0.33,
+                    0.05,
+                    1.0
+                ],
+                "specular_color": [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "ambient_color": [
+                    0.2,
+                    0.2,
+                    0.2,
+                    0.2
+                ],
+                "shininess": 32.0,
+                "has_texture": false,
+                "vertex_shader_path": "Shaders\\Default.vert",
+                "fragment_shader_path": "Shaders\\Default.frag"
+            },
+            "render_layer": 0,
+            "visible": true
+        }
+    }
+}

@@ -34,6 +34,10 @@ struct Mesh
     unsigned int vertexCount = 0;
     unsigned int indexCount = 0;
 
+    mutable glm::vec3 boundsMin = glm::vec3(0.0f);
+    mutable glm::vec3 boundsMax = glm::vec3(0.0f);
+    mutable bool boundsValid = false;
+
     // The render adapter registers this to free the GPU buffers of a dying mesh.
     // A plain function pointer: meshes in static resource caches die after the adapter
     using GpuReleaseHook = void (*)(void* context, Mesh* mesh);

@@ -4,6 +4,9 @@
 #include "Components/Transform.h"
 #include "Components/Rigidbody.h"
 #include "Components/Collider.h"
+#include "Components/Camera.h"
+#include "Components/MeshRenderer.h"
+#include "Utils/EntityBounds.h"
 #include <algorithm>
 #include "Logger.h"
 #include "InputHandler.h"
@@ -147,8 +150,14 @@ void PhysicsSystem::update(World& world, float deltaTime)
 
     if (!m_isEnabled) return;
 
+    m_triggers.update(world);
+
     gatherEntities(world);
-    if (m_entities.empty()) return;
+    if (m_entities.empty())
+    {
+        for (auto& buffer : m_contactBuffers) buffer.clear();
+        return;
+    }
 
     m_accumulator += deltaTime;
 
@@ -180,6 +189,12 @@ void PhysicsSystem::update(World& world, float deltaTime)
 void PhysicsSystem::setEnabled(bool isEnabled)
 {
     m_isEnabled = isEnabled;
+
+    if (!isEnabled)
+    {
+        m_triggers.clear();
+        for (auto& buffer : m_contactBuffers) buffer.clear();
+    }
 }
 
 void PhysicsSystem::gatherEntities(World& world)
@@ -359,37 +374,87 @@ void PhysicsSystem::renderDebugColliders(World& world)
 {
     if (!m_renderer) return;
 
+    glm::vec3 cameraPosition(0.0f);
+    bool hasCamera = false;
+    auto& cameras = world.getComponentPool<Camera>();
+    for (size_t i = 0; i < cameras.size(); ++i)
+    {
+        if (!cameras.components()[i].isActive) continue;
+        if (const Transform* transform = world.getComponent<Transform>(cameras.entities()[i]))
+        {
+            cameraPosition = transform->position;
+            hasCamera = true;
+        }
+        break;
+    }
+
+    const glm::vec4 touchingColor(0.2f, 1.0f, 0.3f, 0.9f);
+
     m_renderer->beginDebugDraw();
 
-    auto& cPool = world.getComponentPool<Collider>();
-    auto& tPool = world.getComponentPool<Transform>();
-
-    auto& cols = cPool.components();
-    auto& ents = cPool.entities();
-
-    for (size_t i = 0; i < cols.size(); ++i)
+    auto& colliders = world.getComponentPool<Collider>();
+    for (size_t i = 0; i < colliders.size(); ++i)
     {
-        const EntityId e = ents[i];
-        const Transform* tr = tPool.getComponent(e);
-        if (!tr) continue;
+        const EntityId entity = colliders.entities()[i];
+        const Collider& collider = colliders.components()[i];
 
-        const Collider& col = cols[i];
-        const glm::vec3 pos = tr->getWorldPosition();
+        Bounds bounds;
+        if (!EntityBounds::compute(world, entity, bounds)) continue;
 
-        const glm::vec3 worldMin = col.getWorldMin(pos);
-        const glm::vec3 worldMax = col.getWorldMax(pos);
+        const bool containsCamera = hasCamera
+            && glm::all(glm::greaterThanEqual(cameraPosition, bounds.min))
+            && glm::all(glm::lessThanEqual(cameraPosition, bounds.max));
+        if (containsCamera && !world.getComponent<MeshRenderer>(entity)) continue;
 
-        const glm::vec4 color = col.isTrigger
-            ? glm::vec4(1.0f, 1.0f, 0.0f, 0.5f)
-            : glm::vec4(1.0f, 0.0f, 0.0f, 0.5f);
-
-        if (col.type == ColliderType::Box)
+        glm::vec4 color(0.3f, 0.6f, 1.0f, 0.6f);
+        if (m_triggers.isTouching(entity))
         {
-            m_renderer->drawDebugAABB(worldMin, worldMax, color);
+            color = touchingColor;
         }
-        else if (col.type == ColliderType::Sphere)
+        else if (collider.isTrigger)
         {
-            m_renderer->drawDebugSphere(pos, col.radius + 0.05f, color);
+            color = glm::vec4(1.0f, 0.85f, 0.1f, 0.6f);
+        }
+        else if (world.getComponent<Rigidbody>(entity))
+        {
+            color = glm::vec4(1.0f, 0.2f, 0.2f, 0.6f);
+        }
+
+        if (collider.type == ColliderType::Box)
+        {
+            m_renderer->drawDebugAABB(bounds.min, bounds.max, color);
+        }
+        else
+        {
+            m_renderer->drawDebugSphere((bounds.min + bounds.max) * 0.5f, collider.radius + 0.05f, color);
+        }
+    }
+
+    for (const auto& [trigger, other] : m_triggers.pairs())
+    {
+        Bounds a;
+        Bounds b;
+        if (!EntityBounds::compute(world, trigger, a) || !EntityBounds::compute(world, other, b)) continue;
+
+        const glm::vec3 min = glm::max(a.min, b.min);
+        const glm::vec3 max = glm::min(a.max, b.max);
+        if (glm::all(glm::lessThanEqual(min, max)))
+        {
+            m_renderer->drawDebugAABB(min - glm::vec3(0.01f), max + glm::vec3(0.01f), touchingColor);
+        }
+    }
+
+    for (const auto& buffer : m_contactBuffers)
+    {
+        for (const Contact& contact : buffer)
+        {
+            const glm::vec3 point = contact.info.contactPoint;
+            const float size = 0.12f;
+            const glm::vec4 contactColor(1.0f, 1.0f, 1.0f, 1.0f);
+            m_renderer->drawDebugLine(point - glm::vec3(size, 0, 0), point + glm::vec3(size, 0, 0), contactColor);
+            m_renderer->drawDebugLine(point - glm::vec3(0, size, 0), point + glm::vec3(0, size, 0), contactColor);
+            m_renderer->drawDebugLine(point - glm::vec3(0, 0, size), point + glm::vec3(0, 0, size), contactColor);
+            m_renderer->drawDebugLine(point, point + contact.info.normal * 0.5f, glm::vec4(1.0f, 0.5f, 0.0f, 1.0f));
         }
     }
 

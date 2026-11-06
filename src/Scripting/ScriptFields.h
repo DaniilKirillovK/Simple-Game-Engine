@@ -6,11 +6,13 @@
 
 #include <pybind11/pybind11.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 class ScriptFields
@@ -453,6 +455,107 @@ public:
             }
 
             behaviour.attr(field.name.c_str()) = toPython(field, value);
+        }
+    }
+
+    static std::vector<std::string> applyEdits(
+        pybind11::object& behaviour,
+        const Json& previousFields,
+        const Script& script)
+    {
+        pybind11::object behaviourClass = behaviour.attr("__class__");
+
+        Script previous = script;
+        previous.fields = previousFields;
+
+        std::vector<std::string> edited;
+
+        for (const Field& field : readSchema(behaviourClass))
+        {
+            const Json value = effectiveValue(script, field);
+
+            if (value == effectiveValue(previous, field))
+            {
+                continue;
+            }
+
+            const std::string error = validationError(field, value);
+
+            if (!error.empty())
+            {
+                throw std::runtime_error
+                (
+                    "Invalid value for '" + field.name +
+                    "': " + error
+                );
+            }
+
+            behaviour.attr(field.name.c_str()) = toPython(field, value);
+            edited.push_back(field.name);
+        }
+
+        return edited;
+    }
+
+    static void swapClass(
+        pybind11::object& behaviour,
+        pybind11::handle newClass,
+        const Script& script)
+    {
+        pybind11::object oldClass = behaviour.attr("__class__");
+
+        const std::vector<Field> oldSchema = readSchema(oldClass);
+        const std::vector<Field> newSchema = readSchema(newClass);
+
+        std::vector<std::pair<std::string, pybind11::object>> addedValues;
+
+        for (const Field& field : newSchema)
+        {
+            if (field.type == Type::Entity)
+            {
+                pybind11::module_ helpers = pybind11::module_::import("engine_fields");
+
+                helpers.attr("install_entity_field")
+                    (
+                    newClass,
+                    field.name
+                    );
+            }
+
+            const bool known = std::any_of(
+                oldSchema.begin(),
+                oldSchema.end(),
+                [&field](const Field& old)
+                {
+                    return old.name == field.name && old.type == field.type;
+                });
+
+            if (known)
+            {
+                continue;
+            }
+
+            const Json value = effectiveValue(script, field);
+
+            const std::string error = validationError(field, value);
+
+            if (!error.empty())
+            {
+                throw std::runtime_error
+                (
+                    "Invalid value for '" + field.name +
+                    "': " + error
+                );
+            }
+
+            addedValues.emplace_back(field.name, toPython(field, value));
+        }
+
+        behaviour.attr("__class__") = newClass;
+
+        for (const auto& [name, value] : addedValues)
+        {
+            behaviour.attr(name.c_str()) = value;
         }
     }
 };

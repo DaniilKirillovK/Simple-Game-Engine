@@ -51,6 +51,16 @@ void InputHandler::processMouseMoveEvents(const std::vector<MouseMoveEvent>& eve
     {
         const auto& lastMove = events.back();
 
+        if (m_skipMouseDelta)
+        {
+            mouseX = lastMouseX = lastMove.x;
+            mouseY = lastMouseY = lastMove.y;
+            mouseDeltaX = 0.0;
+            mouseDeltaY = 0.0;
+            m_skipMouseDelta = false;
+            return;
+        }
+
         lastMouseX = mouseX;
         lastMouseY = mouseY;
 

@@ -8,6 +8,7 @@
 #include "Systems/PhysicsSystem.h"
 #include "Systems/TransformSystem.h"
 #include "Systems/ScriptSystem.h"
+#include "InputHandler.h"
 
 #include <filesystem>
 #include "Utils/Serialization/SceneSerializer.h"
@@ -52,6 +53,12 @@ void GameplayState::onEnter()
 
 void GameplayState::onExit()
 {
+    if (m_playModeActive)
+    {
+        exitPlayMode();
+        return;
+    }
+
     if (ScriptSystem* scriptSystem = m_world->getSystem<ScriptSystem>())
     {
         scriptSystem->stop();
@@ -61,6 +68,14 @@ void GameplayState::onExit()
 void GameplayState::update(float deltaTime)
 {
     ZoneScoped;
+
+    ScriptSystem* scriptSystem = m_world->getSystem<ScriptSystem>();
+    if (scriptSystem && scriptSystem->consumeRestartRequest() && m_playModeActive)
+    {
+        LOG_INFO("Restart requested by a script");
+        exitPlayMode();
+        enterPlayMode();
+    }
 
     m_world->update(deltaTime);
 }
@@ -132,13 +147,20 @@ void GameplayState::exitPlayMode()
         physicsSystem->setEnabled(false);
     }
 
+    if (CameraSystem* cameraSystem = m_world->getSystem<CameraSystem>())
+    {
+        cameraSystem->setEnabled(true);
+    }
+
+    InputHandler::getInstance().setCursorLocked(false);
+
     m_playModeActive = false;
     restoreSceneState();
 }
 
 void GameplayState::setupTestScene()
 {
-    std::string scenePath = "assets\\scenes\\test_scene.json";
+    std::string scenePath = "assets\\scenes\\lava_platformer.json";
 
     if (std::filesystem::exists(scenePath)) 
     {

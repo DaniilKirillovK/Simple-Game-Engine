@@ -2,45 +2,45 @@
     "version": 1,
     "entity": {
         "tag": {
-            "name": "Enemy"
+            "name": "Moving Platform"
         },
         "transform": {
             "position": [
-                0,
-                0,
-                0
+                0.0,
+                0.0,
+                0.0
             ],
             "rotation": [
-                0,
-                0,
-                0
+                0.0,
+                0.0,
+                0.0
             ],
             "scale": [
-                0.6,
-                0.6,
-                0.6
+                2.4,
+                0.4,
+                2.4
             ]
         },
         "script": {
-            "module": "arena_enemy",
-            "class": "ArenaEnemy",
+            "module": "moving_platform",
+            "class": "MovingPlatform",
             "fields": {
-                "speed": 4.0,
-                "hp": 1,
-                "damage": 1,
-                "touch_radius": 0.7,
-                "score": 15
+                "offset_x": 0.0,
+                "offset_y": 4.0,
+                "offset_z": 0.0,
+                "speed": 2.0,
+                "wait_time": 1.0,
+                "start_delay": 0.0
             }
         },
         "mesh_renderer": {
             "mesh": {
-                "type": "sphere",
-                "radius": 0.5
+                "type": "cube"
             },
             "material": {
                 "diffuse_color": [
-                    0.75,
                     0.2,
+                    0.45,
                     0.9,
                     1.0
                 ],

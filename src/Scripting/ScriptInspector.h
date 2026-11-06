@@ -354,7 +354,20 @@ public:
 
             if (behaviourClass.is_none())
             {
-                ImGui::TextWrapped("Cannot load behaviour. Check the engine log.");
+                const std::string* error = engine.getModuleError(script.moduleName);
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.45f, 0.45f, 1.0f));
+                if (error)
+                {
+                    ImGui::TextWrapped("Script '%s' failed to load:", script.moduleName.c_str());
+                    ImGui::TextWrapped("%s", error->c_str());
+                }
+                else
+                {
+                    ImGui::TextWrapped("Cannot load behaviour '%s.%s'. Check the engine log.",
+                        script.moduleName.c_str(), script.className.c_str());
+                }
+                ImGui::PopStyleColor();
+                ImGui::TextDisabled("Fix the file and save it: the script reloads automatically.");
                 return false;
             }
 

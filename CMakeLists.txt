@@ -11,7 +11,6 @@ set(ASSIMP_DIR "${CMAKE_SOURCE_DIR}/libs/assimp")
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/libs/imgui")
 set(IMGUIZMO_DIR "${CMAKE_SOURCE_DIR}/libs/imgui/imguizmo")
 set(PYBIND11_DIR "${CMAKE_SOURCE_DIR}/libs/pybind11")
-# Python 3.12: headers + import lib for build, embeddable package shipped next to the exe
 set(PYTHON_DIR "${CMAKE_SOURCE_DIR}/libs/python")
 
 file(GLOB IMGUI_SOURCES
@@ -29,7 +28,7 @@ set(GLFW_LIB_NAME "glfw3")
 set(ASSIMP_LIB_DIR "${ASSIMP_DIR}/lib")
 set(ASSIMP_LIB_NAME "assimp-vc143-mt")
 
-add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} ${IMGUIZMO_DIR} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp" "src/Utils/HierarchyUtils.cpp" "src/Utils/json.hpp" "src/Systems/TransformSystem.cpp" "src/Utils/Serialization/SceneSerializer.cpp" "src/Utils/Assets/AssetsUtils.cpp" "external/tracy/TracyClient.cpp" "src/JobSystem/JobSystem.cpp" "src/Resources/AssetLoader.cpp" "src/Scripting/ScriptEngine.cpp" "src/Scripting/ScriptBindings.cpp" "src/Systems/ScriptSystem.cpp" "src/Gameplay/PrefabLibrary.cpp" "src/Scripting/ScriptInspector.h" "src/Scripting/EntityReferenceData.h")
+add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} ${IMGUIZMO_DIR} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/OpenGLRenderAdapter.cpp" ${GLAD_DIR}/src/glad.c "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp" "src/Utils/HierarchyUtils.cpp" "src/Utils/json.hpp" "src/Systems/TransformSystem.cpp" "src/Utils/Serialization/SceneSerializer.cpp" "src/Utils/Assets/AssetsUtils.cpp" "external/tracy/TracyClient.cpp" "src/JobSystem/JobSystem.cpp" "src/Resources/AssetLoader.cpp" "src/Scripting/ScriptEngine.cpp" "src/Scripting/ScriptBindings.cpp" "src/Scripting/ScriptConsole.cpp" "src/Utils/RayCast.cpp" "src/Utils/EntityBounds.cpp" "src/Systems/TriggerTracker.cpp" "src/Systems/ScriptSystem.cpp" "src/Gameplay/PrefabLibrary.cpp" "src/Scripting/ScriptInspector.h" "src/Scripting/EntityReferenceData.h")
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE TRACY_ENABLE)
 target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_SCRIPTS_SOURCE_DIR="${CMAKE_SOURCE_DIR}/scripts")

@@ -7,6 +7,9 @@
 #include <unordered_set>
 #include <memory>
 #include <typeindex>
+#include <typeinfo>
+#include <chrono>
+#include <string>
 #include "JobSystem/JobSystem.h"
 
 class World
@@ -39,12 +42,20 @@ public:
 		return entities;
 	}
 
+	struct SystemTiming
+	{
+		std::string name;
+		float milliseconds = 0.0f;
+	};
+	const std::vector<SystemTiming>& getSystemTimings() const { return m_systemTimings; }
+
 private:
 	float m_currentDeltaTime;
 	EntityId nextEntityId;
 	std::unordered_set<EntityId> entities;
 	std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>> componentPools;
 	std::vector<std::unique_ptr<ISystem>> systems;
+	std::vector<SystemTiming> m_systemTimings;
 };
 
 inline EntityId World::createEntity()
@@ -106,15 +117,25 @@ inline T* World::getSystem()
 
 inline void World::addSystem(std::unique_ptr<ISystem> system)
 {
+	std::string name = typeid(*system).name();
+	const std::string prefix = "class ";
+	if (name.rfind(prefix, 0) == 0) name.erase(0, prefix.size());
+
+	m_systemTimings.push_back({ name, 0.0f });
 	systems.push_back(std::move(system));
 }
 
 inline void World::update(float deltaTime)
 {
 	m_currentDeltaTime = deltaTime;
-	for (std::unique_ptr<ISystem>& system : systems)
+	for (size_t i = 0; i < systems.size(); ++i)
 	{
-		system->update(*this, deltaTime);
+		const auto start = std::chrono::high_resolution_clock::now();
+		systems[i]->update(*this, deltaTime);
+		const float elapsed = std::chrono::duration<float, std::milli>(std::chrono::high_resolution_clock::now() - start).count();
+
+		float& smoothed = m_systemTimings[i].milliseconds;
+		smoothed += (elapsed - smoothed) * 0.05f;
 	}
 }
 

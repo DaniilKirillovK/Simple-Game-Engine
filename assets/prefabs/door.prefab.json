@@ -2,45 +2,46 @@
     "version": 1,
     "entity": {
         "tag": {
-            "name": "Projectile"
+            "name": "Door"
         },
         "transform": {
             "position": [
-                0,
-                0,
-                0
+                0.0,
+                0.0,
+                0.0
             ],
             "rotation": [
-                0,
-                0,
-                0
+                0.0,
+                0.0,
+                0.0
             ],
             "scale": [
-                0.3,
-                0.3,
-                0.3
+                2.0,
+                3.0,
+                0.4
             ]
         },
         "script": {
-            "module": "arena_projectile",
-            "class": "ArenaProjectile",
+            "module": "door",
+            "class": "Door",
             "fields": {
-                "speed": 14.0,
-                "damage": 1,
-                "lifetime": 1.5,
-                "hit_radius": 0.6
+                "open_offset_x": 0.0,
+                "open_offset_y": 3.2,
+                "open_offset_z": 0.0,
+                "speed": 3.0,
+                "starts_open": false,
+                "auto_close_time": 0.0
             }
         },
         "mesh_renderer": {
             "mesh": {
-                "type": "sphere",
-                "radius": 0.5
+                "type": "cube"
             },
             "material": {
                 "diffuse_color": [
-                    1.0,
-                    0.9,
-                    0.2,
+                    0.42,
+                    0.26,
+                    0.14,
                     1.0
                 ],
                 "specular_color": [

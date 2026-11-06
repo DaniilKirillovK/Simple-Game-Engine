@@ -2,46 +2,45 @@
     "version": 1,
     "entity": {
         "tag": {
-            "name": "Enemy"
+            "name": "Pressure Plate"
         },
         "transform": {
             "position": [
-                0,
-                0,
-                0
+                0.0,
+                0.0,
+                0.0
             ],
             "rotation": [
-                0,
-                0,
-                0
+                0.0,
+                0.0,
+                0.0
             ],
             "scale": [
-                0.9,
-                0.9,
-                0.9
+                1.4,
+                0.12,
+                1.4
             ]
         },
         "script": {
-            "module": "arena_enemy",
-            "class": "ArenaEnemy",
+            "module": "trigger_zone",
+            "class": "TriggerZone",
             "fields": {
-                "speed": 2.0,
-                "hp": 2,
-                "damage": 1,
-                "touch_radius": 0.9,
-                "score": 10
+                "action": "open",
+                "once": false,
+                "message": "",
+                "margin": 0.15,
+                "press_depth": 0.06
             }
         },
         "mesh_renderer": {
             "mesh": {
-                "type": "sphere",
-                "radius": 0.5
+                "type": "cube"
             },
             "material": {
                 "diffuse_color": [
-                    0.9,
-                    0.15,
-                    0.15,
+                    0.95,
+                    0.8,
+                    0.1,
                     1.0
                 ],
                 "specular_color": [
@@ -63,6 +62,22 @@
             },
             "render_layer": 0,
             "visible": true
+        },
+        "collider": {
+            "type": "box",
+            "half_size": [
+                0.85,
+                0.21,
+                0.85
+            ],
+            "offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "is_trigger": true,
+            "bounciness": 0.0,
+            "friction": 0.0
         }
     }
 }

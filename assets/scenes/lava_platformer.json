@@ -1,0 +1,3712 @@
+{
+    "version": 1,
+    "entities": [
+        {
+            "tag": {
+                "name": "Camera"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    19.0,
+                    9.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "camera": {
+                "forward": [
+                    0.0,
+                    -0.7071,
+                    -0.7071
+                ],
+                "right": [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                "up": [
+                    0.0,
+                    0.7071,
+                    -0.7071
+                ],
+                "fov": 70.0,
+                "aspect_ratio": 1.7777777777777777,
+                "near_plane": 0.05,
+                "far_plane": 200.0,
+                "is_active": true
+            },
+            "id": 1
+        },
+        {
+            "tag": {
+                "name": "Sun"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "light": {
+                "type": "directional",
+                "color": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "intensity": 0.6,
+                "direction": [
+                    0.4,
+                    -0.8,
+                    0.45
+                ],
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "enabled": true,
+                "constant": 1.0,
+                "linear": 0.09,
+                "quadratic": 0.032,
+                "range": 50.0,
+                "cut_off": 0.9659258127212524,
+                "outer_cut_off": 0.9659258127212524
+            },
+            "id": 2
+        },
+        {
+            "tag": {
+                "name": "Fill Light"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "light": {
+                "type": "directional",
+                "color": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "intensity": 0.45,
+                "direction": [
+                    -0.6,
+                    -0.5,
+                    -0.6
+                ],
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "enabled": true,
+                "constant": 1.0,
+                "linear": 0.09,
+                "quadratic": 0.032,
+                "range": 50.0,
+                "cut_off": 0.9659258127212524,
+                "outer_cut_off": 0.9659258127212524
+            },
+            "id": 3
+        },
+        {
+            "tag": {
+                "name": "Back Light"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "light": {
+                "type": "directional",
+                "color": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "intensity": 0.25,
+                "direction": [
+                    0.0,
+                    -0.7,
+                    -0.7
+                ],
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "enabled": true,
+                "constant": 1.0,
+                "linear": 0.09,
+                "quadratic": 0.032,
+                "range": 50.0,
+                "cut_off": 0.9659258127212524,
+                "outer_cut_off": 0.9659258127212524
+            },
+            "id": 4
+        },
+        {
+            "tag": {
+                "name": "Floor"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    -0.5,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    20.0,
+                    1.0,
+                    20.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.62,
+                        0.6,
+                        0.58,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": true,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag",
+                    "diffuse_texture_path": "assets\\textures\\t_cobble4k.png"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 5
+        },
+        {
+            "tag": {
+                "name": "Wall North"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    11.0,
+                    -10.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    22.0,
+                    23.0,
+                    1.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.62,
+                        0.6,
+                        0.58,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": true,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag",
+                    "diffuse_texture_path": "assets\\textures\\t_cobble4k.png"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 6
+        },
+        {
+            "tag": {
+                "name": "Wall South"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    11.0,
+                    10.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    22.0,
+                    23.0,
+                    1.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.62,
+                        0.6,
+                        0.58,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": true,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag",
+                    "diffuse_texture_path": "assets\\textures\\t_cobble4k.png"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 7
+        },
+        {
+            "tag": {
+                "name": "Wall West"
+            },
+            "transform": {
+                "position": [
+                    -10.5,
+                    11.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    23.0,
+                    20.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.62,
+                        0.6,
+                        0.58,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": true,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag",
+                    "diffuse_texture_path": "assets\\textures\\t_cobble4k.png"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 8
+        },
+        {
+            "tag": {
+                "name": "Wall East"
+            },
+            "transform": {
+                "position": [
+                    10.5,
+                    11.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    23.0,
+                    20.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.62,
+                        0.6,
+                        0.58,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": true,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag",
+                    "diffuse_texture_path": "assets\\textures\\t_cobble4k.png"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 9
+        },
+        {
+            "tag": {
+                "name": "Lava"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    -1.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    19.9,
+                    1.0,
+                    19.9
+                ]
+            },
+            "script": {
+                "module": "rising_lava",
+                "class": "RisingLava",
+                "fields": {
+                    "start_delay": 10.0,
+                    "rise_speed": 0.2,
+                    "acceleration": 0.004,
+                    "max_height": 20.0,
+                    "instant_kill": true,
+                    "damage_per_second": 60
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.33,
+                        0.05,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "rising_lava"
+            },
+            "id": 10
+        },
+        {
+            "tag": {
+                "name": "Step 1"
+            },
+            "transform": {
+                "position": [
+                    3.0,
+                    0.8500000000000001,
+                    6.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    3.0,
+                    0.5,
+                    3.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 11
+        },
+        {
+            "tag": {
+                "name": "Step 2"
+            },
+            "transform": {
+                "position": [
+                    7.0,
+                    1.9500000000000002,
+                    5.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    3.0,
+                    0.5,
+                    3.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 12
+        },
+        {
+            "tag": {
+                "name": "Spike Step"
+            },
+            "transform": {
+                "position": [
+                    7.0,
+                    3.05,
+                    1.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    3.0,
+                    0.5,
+                    3.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 13
+        },
+        {
+            "tag": {
+                "name": "Spikes 1"
+            },
+            "transform": {
+                "position": [
+                    7.0,
+                    2.78,
+                    1.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.4,
+                    1.0,
+                    2.4
+                ]
+            },
+            "script": {
+                "module": "spike_trap",
+                "class": "SpikeTrap",
+                "fields": {
+                    "extend_height": 0.9,
+                    "rest_time": 1.6,
+                    "warn_time": 0.5,
+                    "active_time": 1.0,
+                    "speed": 8.0,
+                    "damage": 35,
+                    "phase_offset": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.05,
+                        0.08,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "spike_trap"
+            },
+            "id": 14,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    1.25,
+                    0.55,
+                    1.25
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Crumbling 1"
+            },
+            "transform": {
+                "position": [
+                    3.0,
+                    4.2,
+                    -1.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.0,
+                    0.4,
+                    2.0
+                ]
+            },
+            "script": {
+                "module": "crumbling_platform",
+                "class": "CrumblingPlatform",
+                "fields": {
+                    "delay": 0.7,
+                    "fall_gravity": 18.0,
+                    "respawn_time": 4.0,
+                    "shake": 0.06
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.78,
+                        0.62,
+                        0.38,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "crumbling_platform"
+            },
+            "id": 15
+        },
+        {
+            "tag": {
+                "name": "Crumbling 2"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    5.0,
+                    -1.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.0,
+                    0.4,
+                    2.0
+                ]
+            },
+            "script": {
+                "module": "crumbling_platform",
+                "class": "CrumblingPlatform",
+                "fields": {
+                    "delay": 0.55,
+                    "fall_gravity": 18.0,
+                    "respawn_time": 4.0,
+                    "shake": 0.06
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.78,
+                        0.62,
+                        0.38,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "crumbling_platform"
+            },
+            "id": 16
+        },
+        {
+            "tag": {
+                "name": "Balcony"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    5.75,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    20.0,
+                    0.5,
+                    7.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.5,
+                        0.5,
+                        0.55,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 17
+        },
+        {
+            "tag": {
+                "name": "Partition Left"
+            },
+            "transform": {
+                "position": [
+                    -5.5,
+                    8.0,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    9.0,
+                    4.0,
+                    0.5
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.45,
+                        0.45,
+                        0.5,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 18
+        },
+        {
+            "tag": {
+                "name": "Partition Right"
+            },
+            "transform": {
+                "position": [
+                    5.5,
+                    8.0,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    9.0,
+                    4.0,
+                    0.5
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.45,
+                        0.45,
+                        0.5,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 19
+        },
+        {
+            "tag": {
+                "name": "Partition Lintel"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    9.5,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.0,
+                    1.0,
+                    0.5
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.45,
+                        0.45,
+                        0.5,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 20
+        },
+        {
+            "tag": {
+                "name": "Door 1"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    7.5,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.0,
+                    3.0,
+                    0.4
+                ]
+            },
+            "script": {
+                "module": "door",
+                "class": "Door",
+                "fields": {
+                    "open_offset_x": 0.0,
+                    "open_offset_y": 3.2,
+                    "open_offset_z": 0.0,
+                    "speed": 2.0,
+                    "starts_open": false,
+                    "auto_close_time": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.42,
+                        0.26,
+                        0.14,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "door"
+            },
+            "id": 21
+        },
+        {
+            "tag": {
+                "name": "Target Door 1"
+            },
+            "transform": {
+                "position": [
+                    9.85,
+                    8.5,
+                    -4.6
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.2,
+                    1.2,
+                    1.2
+                ]
+            },
+            "script": {
+                "module": "shoot_target",
+                "class": "ShootTarget",
+                "fields": {
+                    "action": "open",
+                    "hits_required": 1,
+                    "reset_time": 0.0,
+                    "score": 100,
+                    "target": {
+                        "$entity": 21
+                    }
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.95,
+                        0.15,
+                        0.15,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "shoot_target"
+            },
+            "id": 22
+        },
+        {
+            "tag": {
+                "name": "Bonus Target"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    13.5,
+                    -9.85
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.2,
+                    1.2,
+                    0.2
+                ]
+            },
+            "script": {
+                "module": "shoot_target",
+                "class": "ShootTarget",
+                "fields": {
+                    "action": "none",
+                    "hits_required": 1,
+                    "reset_time": 0.0,
+                    "score": 250
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.95,
+                        0.15,
+                        0.15,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "shoot_target"
+            },
+            "id": 23
+        },
+        {
+            "tag": {
+                "name": "Elevator"
+            },
+            "transform": {
+                "position": [
+                    -8.5,
+                    5.85,
+                    -8.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.4,
+                    0.4,
+                    2.4
+                ]
+            },
+            "script": {
+                "module": "moving_platform",
+                "class": "MovingPlatform",
+                "fields": {
+                    "offset_x": 0.0,
+                    "offset_y": 5.0,
+                    "offset_z": 0.0,
+                    "speed": 1.5,
+                    "wait_time": 1.2,
+                    "start_delay": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.2,
+                        0.45,
+                        0.9,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "moving_platform"
+            },
+            "id": 24
+        },
+        {
+            "tag": {
+                "name": "Upper Ledge"
+            },
+            "transform": {
+                "position": [
+                    -8.75,
+                    10.75,
+                    -3.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.5,
+                    0.5,
+                    8.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 25
+        },
+        {
+            "tag": {
+                "name": "Final Step 1"
+            },
+            "transform": {
+                "position": [
+                    -5.0,
+                    11.75,
+                    3.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.5,
+                    0.5,
+                    2.5
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 26
+        },
+        {
+            "tag": {
+                "name": "Shuttle"
+            },
+            "transform": {
+                "position": [
+                    -1.5,
+                    12.3,
+                    3.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.5,
+                    0.4,
+                    2.5
+                ]
+            },
+            "script": {
+                "module": "moving_platform",
+                "class": "MovingPlatform",
+                "fields": {
+                    "offset_x": 5.5,
+                    "offset_y": 0.0,
+                    "offset_z": 0.0,
+                    "speed": 2.0,
+                    "wait_time": 0.8,
+                    "start_delay": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.2,
+                        0.45,
+                        0.9,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "moving_platform"
+            },
+            "id": 27
+        },
+        {
+            "tag": {
+                "name": "Final Step 2"
+            },
+            "transform": {
+                "position": [
+                    7.6,
+                    13.15,
+                    4.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    3.0,
+                    0.5,
+                    3.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 28
+        },
+        {
+            "tag": {
+                "name": "Spikes 2"
+            },
+            "transform": {
+                "position": [
+                    7.6,
+                    12.88,
+                    4.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.4,
+                    1.0,
+                    2.4
+                ]
+            },
+            "script": {
+                "module": "spike_trap",
+                "class": "SpikeTrap",
+                "fields": {
+                    "extend_height": 0.9,
+                    "rest_time": 1.6,
+                    "warn_time": 0.5,
+                    "active_time": 1.0,
+                    "speed": 8.0,
+                    "damage": 35,
+                    "phase_offset": 1.3
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.05,
+                        0.08,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "spike_trap"
+            },
+            "id": 29,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    1.25,
+                    0.55,
+                    1.25
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Final Step 3"
+            },
+            "transform": {
+                "position": [
+                    7.6,
+                    13.95,
+                    -0.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    3.0,
+                    0.5,
+                    3.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 30
+        },
+        {
+            "tag": {
+                "name": "Exit Floor"
+            },
+            "transform": {
+                "position": [
+                    8.0,
+                    14.75,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    4.0,
+                    0.5,
+                    7.0
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.55,
+                        0.57,
+                        0.62,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 31
+        },
+        {
+            "tag": {
+                "name": "Exit Wall Left"
+            },
+            "transform": {
+                "position": [
+                    6.5,
+                    16.5,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    3.0,
+                    0.5
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.35,
+                        0.4,
+                        0.38,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 32
+        },
+        {
+            "tag": {
+                "name": "Exit Wall Right"
+            },
+            "transform": {
+                "position": [
+                    9.5,
+                    16.5,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    3.0,
+                    0.5
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.35,
+                        0.4,
+                        0.38,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 33
+        },
+        {
+            "tag": {
+                "name": "Exit Wall West"
+            },
+            "transform": {
+                "position": [
+                    6.25,
+                    16.5,
+                    -8.4
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.5,
+                    3.0,
+                    3.3
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.35,
+                        0.4,
+                        0.38,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 34
+        },
+        {
+            "tag": {
+                "name": "Exit Door"
+            },
+            "transform": {
+                "position": [
+                    8.0,
+                    16.5,
+                    -6.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.0,
+                    3.0,
+                    0.4
+                ]
+            },
+            "script": {
+                "module": "door",
+                "class": "Door",
+                "fields": {
+                    "open_offset_x": 0.0,
+                    "open_offset_y": 3.2,
+                    "open_offset_z": 0.0,
+                    "speed": 4.0,
+                    "starts_open": false,
+                    "auto_close_time": 15.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.42,
+                        0.26,
+                        0.14,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "door"
+            },
+            "id": 35
+        },
+        {
+            "tag": {
+                "name": "Exit Pad"
+            },
+            "transform": {
+                "position": [
+                    8.25,
+                    15.03,
+                    -8.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.6,
+                    0.06,
+                    2.2
+                ]
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.15,
+                        0.95,
+                        0.35,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "id": 36
+        },
+        {
+            "tag": {
+                "name": "Exit"
+            },
+            "transform": {
+                "position": [
+                    8.25,
+                    16.0,
+                    -8.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    3.0,
+                    2.0,
+                    2.5
+                ]
+            },
+            "script": {
+                "module": "trigger_zone",
+                "class": "TriggerZone",
+                "fields": {
+                    "action": "none",
+                    "once": false,
+                    "message": "",
+                    "margin": 0.0,
+                    "press_depth": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.2,
+                        0.9,
+                        0.3,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": false
+            },
+            "prefab": {
+                "name": "trigger_zone"
+            },
+            "id": 37,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    1.5,
+                    1.0,
+                    1.25
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Exit Plate"
+            },
+            "transform": {
+                "position": [
+                    -8.75,
+                    11.06,
+                    -4.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.4,
+                    0.12,
+                    1.4
+                ]
+            },
+            "script": {
+                "module": "trigger_zone",
+                "class": "TriggerZone",
+                "fields": {
+                    "action": "open",
+                    "once": false,
+                    "message": "The exit door is open for 15 seconds - hurry along the platforms!",
+                    "margin": 0.15,
+                    "press_depth": 0.06,
+                    "target": {
+                        "$entity": 35
+                    }
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.95,
+                        0.8,
+                        0.1,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "pressure_plate"
+            },
+            "id": 38,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.85,
+                    0.21,
+                    0.85
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Hint Start"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    1.0,
+                    7.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    8.0,
+                    2.0,
+                    5.0
+                ]
+            },
+            "script": {
+                "module": "trigger_zone",
+                "class": "TriggerZone",
+                "fields": {
+                    "action": "none",
+                    "once": false,
+                    "message": "Climb up! The lava will start rising soon.",
+                    "margin": 0.0,
+                    "press_depth": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.2,
+                        0.9,
+                        0.3,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": false
+            },
+            "prefab": {
+                "name": "trigger_zone"
+            },
+            "id": 39,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    4.0,
+                    1.0,
+                    2.5
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Hint Door"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    7.0,
+                    -4.6
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    20.0,
+                    2.0,
+                    3.0
+                ]
+            },
+            "script": {
+                "module": "trigger_zone",
+                "class": "TriggerZone",
+                "fields": {
+                    "action": "none",
+                    "once": false,
+                    "message": "Shoot the red target on the right wall to open the door.",
+                    "margin": 0.0,
+                    "press_depth": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.2,
+                        0.9,
+                        0.3,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": false
+            },
+            "prefab": {
+                "name": "trigger_zone"
+            },
+            "id": 40,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    10.0,
+                    1.0,
+                    1.5
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Hint Elevator"
+            },
+            "transform": {
+                "position": [
+                    -4.0,
+                    7.0,
+                    -8.4
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    12.0,
+                    2.0,
+                    3.0
+                ]
+            },
+            "script": {
+                "module": "trigger_zone",
+                "class": "TriggerZone",
+                "fields": {
+                    "action": "none",
+                    "once": false,
+                    "message": "Ride the elevator and step on the yellow plate.",
+                    "margin": 0.0,
+                    "press_depth": 0.0
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "cube"
+                },
+                "material": {
+                    "diffuse_color": [
+                        0.2,
+                        0.9,
+                        0.3,
+                        1.0
+                    ],
+                    "specular_color": [
+                        0.5,
+                        0.5,
+                        0.5,
+                        0.5
+                    ],
+                    "ambient_color": [
+                        0.2,
+                        0.2,
+                        0.2,
+                        0.2
+                    ],
+                    "shininess": 32.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": false
+            },
+            "prefab": {
+                "name": "trigger_zone"
+            },
+            "id": 41,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    6.0,
+                    1.0,
+                    1.5
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Player"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    7.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "script": {
+                "module": "fps_player",
+                "class": "FpsPlayer",
+                "fields": {
+                    "move_speed": 6.0,
+                    "sprint_multiplier": 1.5,
+                    "jump_speed": 7.5,
+                    "gravity": 20.0,
+                    "mouse_sensitivity": 0.12,
+                    "invert_y": false,
+                    "start_yaw": 0.0,
+                    "max_health": 100,
+                    "invulnerability": 0.6,
+                    "radius": 0.35,
+                    "height": 1.8,
+                    "eye_height": 1.6,
+                    "fire_cooldown": 0.18,
+                    "shot_range": 60.0,
+                    "shot_damage": 1,
+                    "impact_prefab": "shot_impact"
+                }
+            },
+            "prefab": {
+                "name": "fps_player"
+            },
+            "id": 42,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.35,
+                    0.9,
+                    0.35
+                ],
+                "offset": [
+                    0.0,
+                    0.9,
+                    0.0
+                ],
+                "is_trigger": false,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    -4.0,
+                    1.0,
+                    6.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 50,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 44,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    -8.5,
+                    1.0,
+                    -1.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 75,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 45,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    3.0,
+                    2.1,
+                    6.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 50,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 46,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    7.0,
+                    4.4,
+                    1.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 100,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 47,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    1.5,
+                    5.9,
+                    -1.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 75,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 48,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    8.5,
+                    7.0,
+                    -4.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 50,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 49,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    -8.5,
+                    7.0,
+                    -4.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 50,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 50,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    8.5,
+                    7.0,
+                    -8.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 50,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 51,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    -8.75,
+                    12.0,
+                    -6.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 50,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 52,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    1.25,
+                    13.6,
+                    3.5
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 100,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 53,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    8.6,
+                    14.4,
+                    5.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 100,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 54,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Coin"
+            },
+            "transform": {
+                "position": [
+                    9.3,
+                    16.0,
+                    -4.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.55,
+                    0.55,
+                    0.12
+                ]
+            },
+            "script": {
+                "module": "coin",
+                "class": "Coin",
+                "fields": {
+                    "value": 50,
+                    "spin_speed": 150.0,
+                    "bob_height": 0.12,
+                    "bob_speed": 2.5,
+                    "pickup_margin": 0.25,
+                    "pickup_effect": "shot_impact"
+                }
+            },
+            "mesh_renderer": {
+                "mesh": {
+                    "type": "sphere",
+                    "radius": 0.5,
+                    "sectors": 16,
+                    "stacks": 8
+                },
+                "material": {
+                    "diffuse_color": [
+                        1.0,
+                        0.78,
+                        0.12,
+                        1.0
+                    ],
+                    "specular_color": [
+                        1.0,
+                        0.9,
+                        0.5,
+                        1.0
+                    ],
+                    "ambient_color": [
+                        0.35,
+                        0.28,
+                        0.05,
+                        1.0
+                    ],
+                    "shininess": 64.0,
+                    "has_texture": false,
+                    "vertex_shader_path": "Shaders\\Default.vert",
+                    "fragment_shader_path": "Shaders\\Default.frag"
+                },
+                "render_layer": 0,
+                "visible": true
+            },
+            "prefab": {
+                "name": "coin"
+            },
+            "id": 55,
+            "collider": {
+                "type": "box",
+                "half_size": [
+                    0.525,
+                    0.525,
+                    0.31
+                ],
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "is_trigger": true,
+                "bounciness": 0.0,
+                "friction": 0.0
+            }
+        },
+        {
+            "tag": {
+                "name": "Game"
+            },
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "script": {
+                "module": "lava_game",
+                "class": "LavaGame",
+                "fields": {
+                    "show_help": true,
+                    "player": {
+                        "$entity": 42
+                    },
+                    "lava": {
+                        "$entity": 10
+                    },
+                    "exit_zone": {
+                        "$entity": 37
+                    }
+                }
+            },
+            "prefab": {
+                "name": "lava_game"
+            },
+            "id": 43
+        }
+    ]
+}

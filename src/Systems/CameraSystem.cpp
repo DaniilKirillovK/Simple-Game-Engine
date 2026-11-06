@@ -11,6 +11,8 @@ void CameraSystem::update(World& world, float deltaTime)
 {
     ZoneScopedN("CameraSystem::update");
 
+    if (!m_isEnabled) return;
+
     auto& camPool = world.getComponentPool<Camera>();
     auto& cameras = camPool.components();
     auto& camEnts = camPool.entities();
@@ -32,7 +34,7 @@ void CameraSystem::update(World& world, float deltaTime)
     if (!transform || !camera) return;
 
     float moveSpeed = 10.0f;
-    float lookSpeed = 300.0f;
+    float lookSensitivity = 0.25f;
 
     if (InputHandler::getInstance().isActionActive("MoveForward"))
     {
@@ -59,8 +61,6 @@ void CameraSystem::update(World& world, float deltaTime)
         transform->position -= glm::vec3(0.0f, moveSpeed * deltaTime, 0.0f);
     }
 
-    static float yaw = -90.0f;
-    static float pitch = 0.0f;
     static double lastX = 400, lastY = 300;
     static bool firstMouse = true;
 
@@ -82,8 +82,12 @@ void CameraSystem::update(World& world, float deltaTime)
 
     if (InputHandler::getInstance().isMouseButtonPressed(OpenGLMouseButton::Right))
     {
-        yaw += xoffset * lookSpeed * deltaTime;
-        pitch += yoffset * lookSpeed * deltaTime;
+        const glm::vec3 current = glm::normalize(camera->forward);
+        float yaw = glm::degrees(atan2(current.z, current.x));
+        float pitch = glm::degrees(asin(glm::clamp(current.y, -1.0f, 1.0f)));
+
+        yaw += xoffset * lookSensitivity;
+        pitch += yoffset * lookSensitivity;
 
         if (pitch > 89.0f) pitch = 89.0f;
         if (pitch < -89.0f) pitch = -89.0f;

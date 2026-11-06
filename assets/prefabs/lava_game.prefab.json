@@ -1,0 +1,32 @@
+{
+    "version": 1,
+    "entity": {
+        "tag": {
+            "name": "Game"
+        },
+        "transform": {
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        "script": {
+            "module": "lava_game",
+            "class": "LavaGame",
+            "fields": {
+                "show_help": true
+            }
+        }
+    }
+}

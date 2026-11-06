@@ -70,6 +70,10 @@ public:
 
     void clearFrameState();
 
+    void setCursorLocked(bool locked) { m_cursorLocked = locked; }
+    bool isCursorLocked() const { return m_cursorLocked; }
+    void skipNextMouseDelta() { m_skipMouseDelta = true; }
+
 private:
     InputHandler() = default;
 
@@ -92,4 +96,7 @@ private:
     double lastScrollY = 0.0;
 
     std::unordered_map<std::string, KeyCode> m_actionMap;
+
+    bool m_cursorLocked = false;
+    bool m_skipMouseDelta = false;
 };

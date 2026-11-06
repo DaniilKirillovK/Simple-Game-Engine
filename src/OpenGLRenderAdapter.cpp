@@ -28,6 +28,7 @@
 #include "Scripting/ScriptInspector.h"
 
 #include "Utils/HierarchyUtils.h"
+#include "Utils/RayCast.h"
 #include "Utils/Serialization/SceneSerializer.h"
 #include "libs/imgui/imgui_internal.h"
 #include <Resources/ResourceManager.h>
@@ -35,6 +36,7 @@
 #include "Gameplay/PrefabLibrary.h"
 #include "Components/PrefabInstance.h"
 #include "Systems/ScriptSystem.h"
+#include "Scripting/ScriptConsole.h"
 #include <optional>
 
 static const char* debugVertexShaderSource = R"(
@@ -118,6 +120,24 @@ bool OpenGLRenderAdapter::initialize(int width, int height)
 void OpenGLRenderAdapter::render(World* world)
 {
     m_world = world;
+
+    if (m_stopRequested)
+    {
+        m_stopRequested = false;
+        if (m_isPlaying)
+        {
+            m_isPlaying = false;
+            if (m_onStopCallback) m_onStopCallback();
+        }
+    }
+
+    if (m_consoleToggleRequested)
+    {
+        m_consoleToggleRequested = false;
+        toggleScriptConsoleFocus();
+    }
+
+    applyCursorLock();
 
     endRenderToTexture();
 
@@ -211,6 +231,22 @@ void OpenGLRenderAdapter::onKey(int key, int action)
         return;
     }
 
+    if (event.pressed && key == GLFW_KEY_F1)
+    {
+        m_consoleToggleRequested = true;
+        return;
+    }
+
+    if (event.pressed && ImGui::GetCurrentContext() && ImGui::GetIO().WantTextInput)
+    {
+        return;
+    }
+
+    if (event.pressed && key == GLFW_KEY_ESCAPE && m_isPlaying)
+    {
+        m_stopRequested = true;
+    }
+
     keyEvents.push_back(event);
 }
 
@@ -226,6 +262,11 @@ void OpenGLRenderAdapter::onMouseButton(int button, int action)
     else
     {
         event.pressed = false;
+    }
+
+    if (event.pressed && !InputHandler::getInstance().isCursorLocked() && !m_viewportHovered)
+    {
+        return;
     }
 
     mouseButtonEvents.push_back(event);
@@ -668,8 +709,36 @@ void OpenGLRenderAdapter::resizeRenderTexture(int width, int height)
     createRenderTexture(width, height);
 }
 
+void OpenGLRenderAdapter::toggleScriptConsoleFocus()
+{
+    InputHandler& input = InputHandler::getInstance();
+
+    if (m_scriptConsoleFocused)
+    {
+        m_scriptConsoleFocusChange = -1;
+        if (m_relockCursorAfterConsole && m_isPlaying)
+        {
+            input.setCursorLocked(true);
+        }
+        m_relockCursorAfterConsole = false;
+        return;
+    }
+
+    m_relockCursorAfterConsole = input.isCursorLocked();
+    input.setCursorLocked(false);
+    m_showScriptConsole = true;
+    m_scriptConsoleFocusChange = 1;
+}
+
 void OpenGLRenderAdapter::renderUI()
 {
+    if (m_scriptConsoleFocusChange < 0)
+    {
+        ImGui::ClearActiveID();
+        ImGui::SetWindowFocus(nullptr);
+        m_scriptConsoleFocusChange = 0;
+    }
+
     renderMainMenuBar();
 
     if (m_showViewport) renderUIViewport();
@@ -677,6 +746,7 @@ void OpenGLRenderAdapter::renderUI()
     if (m_showInspector) renderInspector();
     if (m_showStatistics) renderStatistics();
     if (m_showLogPanel) renderLogPanel();
+    if (m_showScriptConsole) renderScriptConsole();
     if (m_showAssetBrowser) renderAssetBrowser();
     if (m_showPrefabs) renderPrefabPanel();
 
@@ -932,7 +1002,18 @@ void OpenGLRenderAdapter::renderUIViewport()
         {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
-            ImVec2 textPos(imagePos.x + 12.0f, imagePos.y + 10.0f);
+            const float flash = scripts->getScreenFlashAlpha();
+            if (flash > 0.001f)
+            {
+                drawScreenFlash(scripts->getScreenFlashColor(), flash, imagePos, imageSize);
+            }
+
+            float hudTop = imagePos.y + 10.0f;
+            if (!m_cursorLockApplied)
+            {
+                hudTop = std::max(hudTop, ImGui::GetWindowPos().y + TOOLBAR_OFFSET + TOOLBAR_HEIGHT + 8.0f);
+            }
+            ImVec2 textPos(imagePos.x + 12.0f, hudTop);
 
             for (const auto& [key, text] : scripts->getHud())
             {
@@ -941,6 +1022,11 @@ void OpenGLRenderAdapter::renderUIViewport()
                     ImVec2(textPos.x + size.x + 4.0f, textPos.y + size.y + 2.0f), IM_COL32(0, 0, 0, 150), 3.0f);
                 drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), text.c_str());
                 textPos.y += lineHeight;
+            }
+
+            if (!scripts->getHudCenter().empty())
+            {
+                drawCenterMessage(scripts->getHudCenter(), imagePos, imageSize);
             }
         }
 
@@ -1008,12 +1094,162 @@ void OpenGLRenderAdapter::renderUIViewport()
             }
         }
 
-        ImVec2 toolbarPos = ImGui::GetWindowPos();
-        ImVec2 toolbarSize = ImGui::GetContentRegionAvail();
-        renderToolbar(toolbarPos, toolbarSize);
+        if (m_cursorLockApplied)
+        {
+            drawCrosshair(imagePos, imageSize);
+        }
+
+        const bool clickedViewport = !m_isPlaying
+            && ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+            && ImGui::IsWindowHovered()
+            && !ImGui::IsAnyItemHovered()
+            && !ImGuizmo::IsOver()
+            && !ImGuizmo::IsUsing();
+
+        if (clickedViewport)
+        {
+            selectEntityAt(imagePos, imageSize);
+        }
+
+        if (!m_cursorLockApplied)
+        {
+            ImVec2 toolbarPos = ImGui::GetWindowPos();
+            ImVec2 toolbarSize = ImGui::GetContentRegionAvail();
+            renderToolbar(toolbarPos, toolbarSize);
+        }
     }
 
     ImGui::End();
+}
+
+void OpenGLRenderAdapter::applyCursorLock()
+{
+    InputHandler& input = InputHandler::getInstance();
+
+    if (input.isCursorLocked() && !m_isPlaying)
+    {
+        input.setCursorLocked(false);
+    }
+
+    const bool locked = input.isCursorLocked();
+    if (locked == m_cursorLockApplied) return;
+    m_cursorLockApplied = locked;
+
+    glfwSetInputMode(m_window, GLFW_CURSOR, locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    if (glfwRawMouseMotionSupported())
+    {
+        glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, locked ? GLFW_TRUE : GLFW_FALSE);
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (locked)
+    {
+        io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+    }
+    else
+    {
+        io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+    }
+
+    input.skipNextMouseDelta();
+}
+
+void OpenGLRenderAdapter::drawScreenFlash(const glm::vec3& color, float alpha, ImVec2 imagePos, ImVec2 imageSize)
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    auto withAlpha = [&](float value)
+    {
+        return ImGui::ColorConvertFloat4ToU32(ImVec4(color.r, color.g, color.b, std::clamp(value, 0.0f, 1.0f)));
+    };
+
+    const ImU32 edge = withAlpha(alpha);
+    const ImU32 clear = withAlpha(0.0f);
+    const ImVec2 min = imagePos;
+    const ImVec2 max(imagePos.x + imageSize.x, imagePos.y + imageSize.y);
+    const float bandX = imageSize.x * 0.22f;
+    const float bandY = imageSize.y * 0.28f;
+
+    drawList->AddRectFilled(min, max, withAlpha(alpha * 0.25f));
+    drawList->AddRectFilledMultiColor(min, ImVec2(max.x, min.y + bandY), edge, edge, clear, clear);
+    drawList->AddRectFilledMultiColor(ImVec2(min.x, max.y - bandY), max, clear, clear, edge, edge);
+    drawList->AddRectFilledMultiColor(min, ImVec2(min.x + bandX, max.y), edge, clear, clear, edge);
+    drawList->AddRectFilledMultiColor(ImVec2(max.x - bandX, min.y), max, clear, edge, edge, clear);
+}
+
+void OpenGLRenderAdapter::drawCenterMessage(const std::string& message, ImVec2 imagePos, ImVec2 imageSize)
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImFont* font = ImGui::GetFont();
+    const float fontSize = ImGui::GetFontSize() * 2.2f;
+
+    std::vector<std::string> lines;
+    size_t start = 0;
+    while (start <= message.size())
+    {
+        size_t end = message.find('\n', start);
+        if (end == std::string::npos) end = message.size();
+        lines.push_back(message.substr(start, end - start));
+        start = end + 1;
+    }
+
+    float width = 0.0f;
+    for (const std::string& line : lines)
+    {
+        width = std::max(width, font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, line.c_str()).x);
+    }
+
+    const float lineHeight = fontSize * 1.2f;
+    const float height = lineHeight * lines.size();
+    const ImVec2 center(imagePos.x + imageSize.x * 0.5f, imagePos.y + imageSize.y * 0.4f);
+    const float padding = fontSize * 0.6f;
+
+    drawList->AddRectFilled(
+        ImVec2(center.x - width * 0.5f - padding, center.y - height * 0.5f - padding * 0.6f),
+        ImVec2(center.x + width * 0.5f + padding, center.y + height * 0.5f + padding * 0.6f),
+        IM_COL32(0, 0, 0, 170), 8.0f);
+
+    float y = center.y - height * 0.5f;
+    for (const std::string& line : lines)
+    {
+        const float lineWidth = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, line.c_str()).x;
+        drawList->AddText(font, fontSize, ImVec2(center.x - lineWidth * 0.5f, y), IM_COL32(255, 235, 200, 255), line.c_str());
+        y += lineHeight;
+    }
+}
+
+void OpenGLRenderAdapter::drawCrosshair(ImVec2 imagePos, ImVec2 imageSize)
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const ImVec2 center(imagePos.x + imageSize.x * 0.5f, imagePos.y + imageSize.y * 0.5f);
+    const float size = 7.0f;
+    const float gap = 3.0f;
+
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const ImU32 color = pass == 0 ? IM_COL32(0, 0, 0, 160) : IM_COL32(255, 255, 255, 230);
+        const float thickness = pass == 0 ? 4.0f : 2.0f;
+
+        drawList->AddLine(ImVec2(center.x - size - gap, center.y), ImVec2(center.x - gap, center.y), color, thickness);
+        drawList->AddLine(ImVec2(center.x + gap, center.y), ImVec2(center.x + size + gap, center.y), color, thickness);
+        drawList->AddLine(ImVec2(center.x, center.y - size - gap), ImVec2(center.x, center.y - gap), color, thickness);
+        drawList->AddLine(ImVec2(center.x, center.y + gap), ImVec2(center.x, center.y + size + gap), color, thickness);
+    }
+}
+
+void OpenGLRenderAdapter::selectEntityAt(ImVec2 imagePos, ImVec2 imageSize)
+{
+    if (!m_world || imageSize.x <= 0.0f || imageSize.y <= 0.0f) return;
+
+    const ImVec2 mouse = ImGui::GetMousePos();
+    const float u = (mouse.x - imagePos.x) / imageSize.x;
+    const float v = (mouse.y - imagePos.y) / imageSize.y;
+    if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) return;
+
+    const glm::vec2 ndc(u * 2.0f - 1.0f, 1.0f - v * 2.0f);
+    const Ray ray = RayCast::fromScreen(ndc, currentViewMatrix, currentProjectionMatrix);
+
+    RayHit hit;
+    m_selectedEntity = RayCast::pickMesh(*m_world, ray, hit) ? hit.entity : -1;
 }
 
 void OpenGLRenderAdapter::renderSceneHierarchy()
@@ -1354,7 +1590,8 @@ void OpenGLRenderAdapter::renderInspector()
     {
         ImGui::PushID("ScriptComponent");
 
-        const bool isPlaying = ScriptEngine::getInstance().getActiveSystem() != nullptr;
+        ScriptSystem* activeScripts = ScriptEngine::getInstance().getActiveSystem();
+        const bool isPlaying = activeScripts != nullptr;
 
         // Prefab instance: compare with the template, apply or revert
         PrefabInstance* instance = m_world->getComponent<PrefabInstance>(m_selectedEntity);
@@ -1370,9 +1607,14 @@ void OpenGLRenderAdapter::renderInspector()
         ScriptInspector::DrawOptions options;
         if (linked) options.baseline = &prefabScript->fields;
 
-        ImGui::BeginDisabled(isPlaying);
+        const nlohmann::json previousFields = isPlaying ? script->fields : nlohmann::json();
 
-        ScriptInspector::draw(*script, *m_world, options);
+        if (ScriptInspector::draw(*script, *m_world, options) && isPlaying)
+        {
+            activeScripts->applyFieldEdits(m_selectedEntity, *script, previousFields);
+        }
+
+        ImGui::BeginDisabled(isPlaying);
 
         if (instance)
         {
@@ -1424,7 +1666,7 @@ void OpenGLRenderAdapter::renderInspector()
 
         if (isPlaying)
         {
-            ImGui::TextWrapped("Stop Play mode to edit script settings.");
+            ImGui::TextWrapped("Field changes apply to the running object and are discarded on Stop.");
         }
 
         ImGui::PopID();
@@ -1456,6 +1698,24 @@ void OpenGLRenderAdapter::renderStatistics()
 
     ImGui::Text("FPS: %d", m_currentFPS);
     ImGui::Text("Frame Time: %.2f ms", deltaTime * 1000.0f);
+
+#ifdef NDEBUG
+    ImGui::Text("Build: Release");
+#else
+    ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Build: Debug");
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::SetTooltip("Unoptimized C++: scripting bindings and math run many times slower. Measure FPS in x64-release.");
+    }
+#endif
+
+    if (m_world && ImGui::CollapsingHeader("Systems (ms per frame)", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (const World::SystemTiming& timing : m_world->getSystemTimings())
+        {
+            ImGui::Text("%-18s %7.3f", timing.name.c_str(), timing.milliseconds);
+        }
+    }
 
     ImGui::Separator();
     if (m_world)
@@ -1558,6 +1818,7 @@ void OpenGLRenderAdapter::renderMainMenuBar()
             ImGui::MenuItem("Statistics", nullptr, &m_showStatistics);
             ImGui::MenuItem("Viewport", nullptr, &m_showViewport);
             ImGui::MenuItem("Log Console", nullptr, &m_showLogPanel);
+            ImGui::MenuItem("Script Console", nullptr, &m_showScriptConsole);
             ImGui::MenuItem("Asset Browser", nullptr, &m_showAssetBrowser);
             ImGui::MenuItem("Prefabs", nullptr, &m_showPrefabs);
 
@@ -1665,8 +1926,8 @@ void OpenGLRenderAdapter::renderTransformEditor(Transform& transform)
 
 void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
 {
-    ImGui::SetNextWindowPos(ImVec2(position.x, position.y + 20));
-    ImGui::SetNextWindowSize(ImVec2(size.x, 40));
+    ImGui::SetNextWindowPos(ImVec2(position.x, position.y + TOOLBAR_OFFSET));
+    ImGui::SetNextWindowSize(ImVec2(size.x, TOOLBAR_HEIGHT));
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoResize |
@@ -1682,6 +1943,7 @@ void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
             if (ImGui::Button("Play"))
             {
                 m_isPlaying = true;
+                m_selectedEntity = -1;
                 if (m_onPlayCallback) m_onPlayCallback();
             }
         }
@@ -1803,6 +2065,141 @@ void OpenGLRenderAdapter::renderLogPanel()
     ImGui::EndChild();
 
     ImGui::End();
+}
+
+void OpenGLRenderAdapter::renderScriptConsole()
+{
+    ImGui::SetNextWindowSize(ImVec2(600.0f, 320.0f), ImGuiCond_FirstUseEver);
+    if (m_scriptConsoleFocusChange > 0)
+    {
+        ImGui::SetNextWindowCollapsed(false);
+        ImGui::SetNextWindowFocus();
+    }
+    if (!ImGui::Begin("Script Console", &m_showScriptConsole))
+    {
+        m_scriptConsoleFocused = false;
+        ImGui::End();
+        return;
+    }
+    m_scriptConsoleFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+    if (ImGui::Button("Clear"))
+    {
+        m_scriptConsole.clearOutput();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset"))
+    {
+        m_scriptConsole.reset();
+        m_scriptConsoleScrollToBottom = true;
+    }
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::SetTooltip("Forget console variables and an unfinished block");
+    }
+    ImGui::SameLine();
+    if (m_isPlaying)
+    {
+        ImGui::TextDisabled("F1: game/console | engine, sel = selected entity | Up/Down: history | Tab: indent");
+    }
+    else
+    {
+        ImGui::TextDisabled("Edit mode: the engine API (find, spawn, entities) works only in Play");
+    }
+
+    ImGui::Separator();
+
+    const float footerHeight = ImGui::GetFrameHeightWithSpacing();
+    ImGui::BeginChild("ScriptConsoleScrollRegion", ImVec2(0, -footerHeight), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+    for (const ScriptConsole::Line& line : m_scriptConsole.lines())
+    {
+        ImVec4 color;
+        switch (line.type)
+        {
+        case ScriptConsole::LineType::Input: color = ImVec4(0.55f, 0.8f, 1.0f, 1.0f); break;
+        case ScriptConsole::LineType::Output: color = ImVec4(0.85f, 0.85f, 0.85f, 1.0f); break;
+        case ScriptConsole::LineType::Error: color = ImVec4(1.0f, 0.35f, 0.35f, 1.0f); break;
+        case ScriptConsole::LineType::Info: color = ImVec4(0.6f, 0.6f, 0.6f, 1.0f); break;
+        }
+
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        ImGui::TextUnformatted(line.text.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    if (m_scriptConsoleScrollToBottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+    {
+        ImGui::SetScrollHereY(1.0f);
+    }
+    m_scriptConsoleScrollToBottom = false;
+
+    ImGui::EndChild();
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(m_scriptConsole.needsMoreInput() ? "..." : ">>>");
+    ImGui::SameLine();
+
+    const ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue
+        | ImGuiInputTextFlags_CallbackHistory
+        | ImGuiInputTextFlags_CallbackCompletion;
+
+    bool reclaimFocus = false;
+    ImGui::PushItemWidth(-FLT_MIN);
+    if (ImGui::InputText("##ScriptConsoleInput", m_scriptConsoleInput, sizeof(m_scriptConsoleInput),
+        flags, &OpenGLRenderAdapter::scriptConsoleInputCallback, this))
+    {
+        m_scriptConsole.submit(m_scriptConsoleInput, m_selectedEntity);
+        m_scriptConsoleInput[0] = '\0';
+        m_scriptConsoleHistoryPos = -1;
+        m_scriptConsoleScrollToBottom = true;
+        reclaimFocus = true;
+    }
+    ImGui::PopItemWidth();
+
+    if (reclaimFocus || m_scriptConsoleFocusChange > 0)
+    {
+        ImGui::SetKeyboardFocusHere(-1);
+        m_scriptConsoleFocusChange = 0;
+    }
+
+    ImGui::End();
+}
+
+int OpenGLRenderAdapter::scriptConsoleInputCallback(ImGuiInputTextCallbackData* data)
+{
+    auto* self = static_cast<OpenGLRenderAdapter*>(data->UserData);
+
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
+    {
+        data->InsertChars(data->CursorPos, "    ");
+        return 0;
+    }
+
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory)
+    {
+        const std::vector<std::string>& history = self->m_scriptConsole.history();
+        const int previousPos = self->m_scriptConsoleHistoryPos;
+        int& pos = self->m_scriptConsoleHistoryPos;
+
+        if (data->EventKey == ImGuiKey_UpArrow && !history.empty())
+        {
+            if (pos == -1) pos = static_cast<int>(history.size()) - 1;
+            else if (pos > 0) --pos;
+        }
+        else if (data->EventKey == ImGuiKey_DownArrow && pos != -1)
+        {
+            if (++pos >= static_cast<int>(history.size())) pos = -1;
+        }
+
+        if (pos != previousPos)
+        {
+            data->DeleteChars(0, data->BufTextLen);
+            data->InsertChars(0, pos >= 0 ? history[pos].c_str() : "");
+        }
+    }
+
+    return 0;
 }
 
 void OpenGLRenderAdapter::renderAssetBrowser()

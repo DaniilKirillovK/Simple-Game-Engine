@@ -2,7 +2,6 @@ import engine
 
 
 class Lifetime(engine.Behaviour):
-    """Destroys its entity after `lifetime` seconds. The value comes from the prefab."""
 
     editor_fields = {
         "lifetime": {

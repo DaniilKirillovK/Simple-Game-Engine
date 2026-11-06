@@ -27,7 +27,6 @@ PrefabLibrary::PrefabLibrary(IRenderAdapter& renderAdapter)
 	: m_renderAdapter(renderAdapter)
 {
 #ifdef ENGINE_PREFABS_SOURCE_DIR
-	// Dev build: read templates from the source tree, so edits there are picked up live
 	const fs::path sourceDir = ENGINE_PREFABS_SOURCE_DIR;
 	m_directory = fs::exists(sourceDir) ? sourceDir : fs::path("assets") / "prefabs";
 #else
@@ -38,7 +37,6 @@ PrefabLibrary::PrefabLibrary(IRenderAdapter& renderAdapter)
 
 bool PrefabLibrary::isValidName(const std::string& name)
 {
-	// Names are file stems; no separators or dots, so a script cannot reach outside the folder
 	return !name.empty() && std::all_of(name.begin(), name.end(), [](char c)
 		{
 			return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-';
@@ -74,7 +72,6 @@ const PrefabLibrary::Prefab* PrefabLibrary::get(const std::string& name)
 		return cached.valid ? &cached : nullptr;
 	}
 
-	// Changed or never loaded. On error keep the previous valid version, the game goes on
 	cached.checkedTime = writeTime;
 
 	Prefab fresh;
@@ -112,7 +109,6 @@ bool PrefabLibrary::load(const fs::path& path, Prefab& prefab)
 	}
 	catch (const Json::parse_error& e)
 	{
-		// e.what() carries line and column
 		LOG_ERROR("Prefab " + file + ": " + e.what());
 		return false;
 	}
@@ -161,7 +157,6 @@ bool PrefabLibrary::load(const fs::path& path, Prefab& prefab)
 
 	try
 	{
-		// Built once per template version: every instance shares one mesh and one shader program
 		if (entity.contains("mesh_renderer"))
 		{
 			MeshRenderer renderer;
@@ -193,7 +188,6 @@ EntityId PrefabLibrary::instantiate(World& world, const std::string& name, const
 
 	try
 	{
-		// Empty id map: entity references stored in a template resolve to null
 		SceneSerializer::deserializeEntity(m_renderAdapter, world, entity, prefab->entity, {});
 	}
 	catch (const std::exception& e)
@@ -228,7 +222,6 @@ EntityId PrefabLibrary::instantiate(World& world, const std::string& name, const
 	{
 		if (Script* script = world.getComponent<Script>(entity))
 		{
-			// Values are validated against the behaviour's schema when the behaviour is created
 			script->fields.update(fieldOverrides);
 		}
 		else
@@ -279,7 +272,6 @@ bool PrefabLibrary::saveFromEntity(World& world, EntityId entity, const std::str
 
 	if (entityJson.contains("transform"))
 	{
-		// Spawn position comes from the caller
 		entityJson["transform"]["position"] = { 0.0f, 0.0f, 0.0f };
 	}
 	if (entityJson.contains("script"))
@@ -304,7 +296,6 @@ bool PrefabLibrary::saveFromEntity(World& world, EntityId entity, const std::str
 	stream << root.dump(4);
 	stream.close();
 
-	// Force a re-read on the next spawn even if the timestamp resolution hides the change
 	m_prefabs.erase(name);
 
 	world.getComponentPool<PrefabInstance>().addComponent(entity, PrefabInstance{ name });
@@ -331,7 +322,6 @@ bool PrefabLibrary::saveScriptFields(const std::string& name, const Json& fields
 		return false;
 	}
 
-	// Edit the raw file, not the cache: the cache has mesh_renderer stripped
 	const fs::path path = pathOf(name);
 	Json root;
 	try

@@ -5,6 +5,7 @@
 #include <functional>
 #include <vector>
 #include "Entity.h"
+#include "Systems/TriggerTracker.h"
 
 class Transform;
 class Rigidbody;
@@ -58,6 +59,8 @@ public:
     bool isDebugRenderingEnabled() const { return m_debugRendering; }
     void toggleDebugRendering() { m_debugRendering = !m_debugRendering; }
 
+    const std::vector<TriggerEvent>& getTriggerEvents() const { return m_triggers.events(); }
+
 private:
     void gatherEntities(World& world);
 
@@ -82,5 +85,6 @@ private:
     bool m_isEnabled = false;
     bool m_debugRendering = true;
     IRenderAdapter* m_renderer = nullptr;
+    TriggerTracker m_triggers;
 };
 

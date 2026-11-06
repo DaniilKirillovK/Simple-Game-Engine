@@ -4,12 +4,6 @@ import engine
 
 
 class PrefabSpawner(engine.Behaviour):
-    """Spawns a prefab around its entity every `interval` seconds.
-
-    All tuning lives in data (ball_spawner.prefab.json or the scene),
-    not in this file.
-    """
-
     editor_fields = {
         "prefab": {
             "type": "str",
@@ -58,7 +52,6 @@ class PrefabSpawner(engine.Behaviour):
         self._alive = []
 
     def on_update(self, dt):
-        # Handles go stale when an instance destroys itself
         self._alive = [entity for entity in self._alive if entity.is_valid()]
 
         self._timer += dt
@@ -74,7 +67,6 @@ class PrefabSpawner(engine.Behaviour):
             random.uniform(-self.spread, self.spread),
         )
 
-        # Per-instance override on top of the template's script fields
         fields = {"lifetime": self.lifetime} if self.lifetime > 0.0 else None
 
         instance = engine.spawn_prefab(
