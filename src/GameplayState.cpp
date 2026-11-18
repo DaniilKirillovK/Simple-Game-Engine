@@ -11,6 +11,7 @@
 #include "InputHandler.h"
 
 #include <filesystem>
+#include <cstdlib>
 #include "Utils/Serialization/SceneSerializer.h"
 #include "Resources/ResourceManager.h"
 #include "MeshFactory.h"
@@ -20,8 +21,9 @@
 
 #include "tracy/Tracy.hpp"
 
-GameplayState::GameplayState(IRenderAdapter& renderer)
+GameplayState::GameplayState(IRenderAdapter& renderer, bool verify)
 : m_renderer(renderer),
+  m_verify(verify),
   m_prefabs(std::make_unique<PrefabLibrary>(renderer))
 {
     setupEditorCallbacks();
@@ -45,6 +47,24 @@ void GameplayState::onEnter()
         }));
     m_world->addSystem(std::make_unique<TransformSystem>());
     m_world->addSystem(std::make_unique<RenderSystem>(&m_renderer));
+
+    if (m_verify)
+    {
+        // Verification renders the scene twice (batching on/off) and compares the
+        // frames pixel for pixel: time-based animation must not run.
+        if (MovementSystem* movement = m_world->getSystem<MovementSystem>())
+        {
+            movement->setEnabled(false);
+        }
+        if (ScriptSystem* scripts = m_world->getSystem<ScriptSystem>())
+        {
+            scripts->setEnabled(false);
+        }
+        if (PhysicsSystem* physics = m_world->getSystem<PhysicsSystem>())
+        {
+            physics->setEnabled(false);
+        }
+    }
 
 	setupTestScene();
 
@@ -161,13 +181,32 @@ void GameplayState::exitPlayMode()
 void GameplayState::setupTestScene()
 {
     std::string scenePath = "assets\\scenes\\lava_platformer.json";
+    const bool overridden = std::getenv("ENGINE_SCENE") != nullptr;
+
+    // Test hook: run a different scene without touching the editor defaults.
+    if (overridden)
+    {
+        scenePath = std::getenv("ENGINE_SCENE");
+    }
+
+    // Log the exact scene file being used: an ENGINE_SCENE left over from a previous
+    // command silently substitutes the scene, so it must be visible in every log.
+    LOG_INFO("setupTestScene: scene path = " + scenePath + (overridden ? " (ENGINE_SCENE override)" : " (default)"));
 
     if (std::filesystem::exists(scenePath)) 
     {
+        // Track the loaded path in the renderer so the editor autosave writes back
+        // to this file instead of clobbering the default scene.
+        m_renderer.setScenePath(scenePath);
+
         if (SceneSerializer::loadScene(m_renderer, *m_world, scenePath))
         {
             LOG_INFO("Scene loaded successfully from: " + scenePath);
         }
+    }
+    else
+    {
+        LOG_WARNING("setupTestScene: scene file not found: " + scenePath);
     }
 
     LOG_INFO("3D scene setup complete");

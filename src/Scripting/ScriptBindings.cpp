@@ -20,6 +20,7 @@
 #include "Utils/RayCast.h"
 #include "Utils/EntityBounds.h"
 #include "Components/Collider.h"
+#include "IRenderAdapter.h"
 #include "tracy/Tracy.hpp"
 #include "tracy/TracyC.h"
 
@@ -80,6 +81,13 @@ ScriptSystem& activeSystem()
 World& activeWorld()
 {
 	return activeSystem().getWorld();
+}
+
+IRenderAdapter* scriptRenderAdapter()
+{
+	IRenderAdapter* adapter = RenderApi::getAdapter();
+	if (!adapter) throw std::runtime_error("Renderer is not initialized");
+	return adapter;
 }
 
 bool isValid(const EntityHandle& entity)
@@ -756,6 +764,98 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 			return ScriptZone(name, color, file, line, function);
 		}, "name"_a, "color"_a, "file"_a, "line"_a, "function"_a);
 	m.def("plot", &plotValue, "name"_a, "value"_a, "Adds a point to the Tracy plot with this name");
+
+	// --- Render diagnostics / instancing demo (works in the editor console too) ---
+	m.def("render_stats", []()
+		{
+			const RenderStats s = scriptRenderAdapter()->getRenderStats();
+			const std::uint32_t batchedCalls = s.instancedDraws + s.indirectDraws;
+			py::dict stats;
+			stats["regular"] = s.regularDraws;
+			stats["instanced"] = s.instancedDraws;
+			stats["indirect"] = s.indirectDraws;
+			stats["batches"] = s.batches;
+			stats["instances"] = s.batchedInstances;
+			stats["saved"] = s.batchedInstances > batchedCalls ? s.batchedInstances - batchedCalls : 0;
+			stats["instancing"] = scriptRenderAdapter()->isInstancingEnabled();
+			stats["indirect_enabled"] = scriptRenderAdapter()->isIndirectDrawEnabled();
+			LOG_INFO("[render_stats] regular=" + std::to_string(s.regularDraws)
+				+ " instanced=" + std::to_string(s.instancedDraws)
+				+ " indirect=" + std::to_string(s.indirectDraws)
+				+ " batches=" + std::to_string(s.batches)
+				+ " instances=" + std::to_string(s.batchedInstances));
+			return stats;
+		}, "Draw statistics of the last rendered frame (regular/instanced/indirect calls, batches, instances, saved)");
+
+	m.def("load_scene", [](const std::string& path) { return scriptRenderAdapter()->loadScene(path); },
+		"path"_a, "Loads a scene file into the editor world");
+
+	m.def("load_instancing_demo", []()
+		{
+			return scriptRenderAdapter()->loadScene("assets\\scenes\\instancing_demo.json");
+		}, "Loads assets/scenes/instancing_demo.json (1000 cubes + 200 spheres)");
+
+	m.def("set_instancing", [](bool enabled)
+		{
+			scriptRenderAdapter()->setInstancingEnabled(enabled);
+			return scriptRenderAdapter()->isInstancingEnabled();
+		}, "enabled"_a, "Batch identical meshes/materials into instanced draws");
+
+	m.def("set_indirect", [](bool enabled)
+		{
+			scriptRenderAdapter()->setIndirectDrawEnabled(enabled);
+			return scriptRenderAdapter()->isIndirectDrawEnabled();
+		}, "enabled"_a, "Submit batched draws through an indirect arguments buffer");
+
+	m.def("instancing", []() { return scriptRenderAdapter()->isInstancingEnabled(); },
+		"True when instancing/batching is enabled");
+	m.def("indirect", []() { return scriptRenderAdapter()->isIndirectDrawEnabled(); },
+		"True when batched draws are submitted indirectly");
+
+	m.def("instancing_check", []()
+		{
+			IRenderAdapter* adapter = scriptRenderAdapter();
+			const RenderStats s = adapter->getRenderStats();
+			const std::uint32_t batchedCalls = s.instancedDraws + s.indirectDraws;
+			const std::uint32_t saved = s.batchedInstances > batchedCalls ? s.batchedInstances - batchedCalls : 0;
+
+			py::dict result;
+			result["instances"] = s.batchedInstances;
+			result["draw_calls"] = batchedCalls;
+			result["saved"] = saved;
+			result["indirect"] = s.indirectDraws;
+
+			std::string reason;
+			bool ok = true;
+			if (!adapter->isInstancingEnabled())
+			{
+				ok = false;
+				reason = "instancing is disabled: press F2 or call engine.set_instancing(True)";
+			}
+			else if (s.batchedInstances == 0 || batchedCalls == 0)
+			{
+				ok = false;
+				reason = "no batched instances in the last frame: run engine.load_instancing_demo(), wait a frame, then check again";
+			}
+			else if (saved == 0)
+			{
+				ok = false;
+				reason = "batching saved no draw calls";
+			}
+
+			result["ok"] = ok;
+			result["reason"] = reason;
+			if (ok)
+			{
+				LOG_INFO("[instancing_check] PASS: " + std::to_string(s.batchedInstances) + " instances -> "
+					+ std::to_string(batchedCalls) + " draw calls (saved " + std::to_string(saved) + ")");
+			}
+			else
+			{
+				LOG_WARNING("[instancing_check] FAIL: " + reason);
+			}
+			return result;
+		}, "Checks instancing batching on the current scene, logs PASS/FAIL and returns the verdict");
 
 	py::exec(R"(
 import functools as _functools

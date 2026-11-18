@@ -1,5 +1,6 @@
 #pragma once
 #include "Resources/ShaderLoader/ShaderProgram.h"
+#include "IRenderAdapter.h"
 #include <glm/glm.hpp>
 #include <functional>
 #include <memory>
@@ -36,6 +37,22 @@ public:
     void drawMesh(const Mesh& mesh, const ShaderProgram& program, const Material& material,
         const std::vector<Light*>& lights, const glm::mat4& model, const glm::mat4& view,
         const glm::mat4& projection, const glm::mat4& normal);
+
+    // Instanced / indirect path: one draw call for all transforms of one mesh.
+    void drawMeshInstanced(const Mesh& mesh, const ShaderProgram& program, const Material& material,
+        const std::vector<Light*>& lights, const glm::mat4& view, const glm::mat4& projection,
+        const std::vector<InstanceData>& instances, bool indirect);
+
+    RenderStats stats() const;
+
+    // Verification support: pass 0 renders with the current settings and writes
+    // scene-<api>.ppm, pass 1 (set by the adapter for the equivalence check) renders
+    // with instancing disabled and writes scene-<api>-off.ppm. The passes are compared
+    // in memory while the pass-1 frame is on the CPU; the PPM files are artifacts only.
+    void setVerifyPass(int pass);
+
+    // Returns the in-memory comparison verdict recorded during pass 1.
+    bool compareVerifyFrames() const;
 
 private:
     struct State;

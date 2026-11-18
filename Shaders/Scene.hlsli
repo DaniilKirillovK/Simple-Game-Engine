@@ -15,7 +15,8 @@ cbuffer DrawConstants : register(b0)
     float4 eye;
     uint lightCount;
     uint hasTexture;
-    float2 padding;
+    uint instanced;
+    uint padding;
     LightData lights[8];
 };
 struct SceneVertex
