@@ -33,9 +33,8 @@ public:
     virtual void render(World* world) = 0;
     virtual void shutdown() = 0;
     virtual bool shouldClose() const = 0;
-    virtual void compileShaders() = 0;
-    virtual bool checkShaderCompileErrors(unsigned int shader, const std::string& type) = 0;
-    virtual void pollEvents() = 0;
+    virtual void clearEvents() = 0;
+    virtual void runFrames(const std::function<void()>& frame) = 0;
 
     virtual void onKey(int key, int action) = 0;
     virtual void onMouseButton(int button, int action) = 0;
@@ -81,9 +80,6 @@ public:
 
     // Shader compile and linkage
     virtual unsigned int compileShaderSource(const std::string& source, ShaderType type) = 0;
-    virtual unsigned int linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader) = 0;
-    virtual void deleteShaderObject(unsigned int shader) = 0;
-    virtual void deleteShaderProgram(unsigned int program) = 0;
 
     // Callbacks
     virtual void setOnToggleDebugCallback(std::function<void(bool)> callback) = 0;

@@ -15,7 +15,7 @@ class Application
 public:
     Application();
     ~Application();
-    bool initialize(int width, int height, const std::string& title);
+    bool initialize(int width, int height, bool vulkan, bool verify);
     void run();
     void shutdown();
 

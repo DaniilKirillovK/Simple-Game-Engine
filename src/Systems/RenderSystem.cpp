@@ -83,7 +83,7 @@ void RenderSystem::update(World& world, float deltaTime)
         const glm::mat4& modelMatrix = tr->worldMatrix;
         const glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
 
-        m_renderAdapter->setShaderProgram(r.material->shaderProgram);
+        m_renderAdapter->setShaderProgram(&r.material->shaderProgram);
 
         m_renderAdapter->setModelMatrix(glm::value_ptr(modelMatrix));
         m_renderAdapter->setViewMatrix(viewPtr);

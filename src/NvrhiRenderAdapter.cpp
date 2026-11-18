@@ -1,5 +1,6 @@
-#include "OpenGLRenderAdapter.h"
+#include "NvrhiRenderAdapter.h"
 
+#include <cmath>
 #include <filesystem>
 
 #include "Logger.h"
@@ -19,7 +20,7 @@
 #include "Common/KeyCode.h"
 #include "libs/imgui/imgui.h"
 #include "libs/imgui/backends/imgui_impl_glfw.h"
-#include "libs/imgui/backends/imgui_impl_opengl3.h"
+#include "GpuRenderer.h"
 #include "libs/imgui/imguizmo/ImGuizmo.h"
 #include "Components/Tag.h"
 #include "Components/Rigidbody.h"
@@ -39,85 +40,54 @@
 #include "Scripting/ScriptConsole.h"
 #include <optional>
 
-static const char* debugVertexShaderSource = R"(
-    #version 330 core
-    layout(location = 0) in vec3 aPos;
-    layout(location = 1) in vec4 aColor;
-    
-    uniform mat4 uView;
-    uniform mat4 uProjection;
-    
-    out vec4 vColor;
-    
-    void main() {
-        gl_Position = uProjection * uView * vec4(aPos, 1.0);
-        vColor = aColor;
-    }
-)";
+static NvrhiRenderAdapter *g_instance = nullptr;
 
-static const char* debugFragmentShaderSource = R"(
-    #version 330 core
-    in vec4 vColor;
-    out vec4 FragColor;
-    
-    void main() {
-        FragColor = vColor;
-    }
-)";
-
-static OpenGLRenderAdapter *g_instance = nullptr;
-
-OpenGLRenderAdapter::OpenGLRenderAdapter()
-    : m_window(nullptr)
+NvrhiRenderAdapter::NvrhiRenderAdapter(bool vulkan, bool verify)
+    : gpu(std::make_unique<GpuRenderer>(vulkan, verify)), m_window(nullptr)
       , m_width(DEFAULT_WIDTH)
       , m_height(DEFAULT_HEIGHT)
       , m_shaderProgram(nullptr)
       , m_world(nullptr)
 {
+    m_autoSaveEnabled = !verify;
     g_instance = this;
 }
 
-OpenGLRenderAdapter::~OpenGLRenderAdapter()
+NvrhiRenderAdapter::~NvrhiRenderAdapter()
 {
     shutdown();
 }
 
-bool OpenGLRenderAdapter::initialize(int width, int height)
+bool NvrhiRenderAdapter::initialize(int width, int height)
 {
     m_width = width;
     m_height = height;
 
-    if (!initGLFW(width, height))
+    m_window = gpu->initialize(width, height);
+    if (!m_window)
     {
-        LOG_ERROR("GLFW initialization error");
         return false;
     }
 
-    if (!initGLAD())
-    {
-        LOG_ERROR("GLAD initialization error");
-        return false;
-    }
+    glfwGetFramebufferSize(m_window, &m_width, &m_height);
+    m_sceneImageSize = ImVec2(float(std::max(1, m_width)), float(std::max(1, m_height)));
+
+    glfwSetKeyCallback(m_window, keyCallback);
+    glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
+    glfwSetCursorPosCallback(m_window, cursorPosCallback);
+    glfwSetScrollCallback(m_window, scrollCallback);
+    glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
 
     initImGui();
 
-    setupOpenGLState();
-
-    setupDebugBuffers();
-    createDebugShader();
-
-    Mesh::gpuReleaseHook = &OpenGLRenderAdapter::releaseMeshBuffersHook;
     Mesh::gpuReleaseContext = this;
-
-    std::string openGLVersion = reinterpret_cast<const char *>(glGetString(GL_VERSION));
-    std::string openGLRenderer = reinterpret_cast<const char *>(glGetString(GL_VERSION));
-    LOG_INFO("OpenGL version: " + openGLVersion);
-    LOG_INFO("OpenGL renderer: " + openGLRenderer);
-
+    Mesh::gpuReleaseHook = [](void* ctx, Mesh* mesh) {
+        static_cast<NvrhiRenderAdapter*>(ctx)->gpu->releaseMesh(mesh);
+    };
     return true;
 }
 
-void OpenGLRenderAdapter::render(World* world)
+void NvrhiRenderAdapter::render(World* world)
 {
     m_world = world;
 
@@ -139,72 +109,37 @@ void OpenGLRenderAdapter::render(World* world)
 
     applyCursorLock();
 
-    endRenderToTexture();
-
-    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
     beginImGuiFrame();
     ImGui::DockSpaceOverViewport();
 
     renderUI();
     
     endImGuiFrame();
-    glfwSwapBuffers(m_window);
-
-    resizeRenderTexture((int)m_viewportSize.x, (int)m_viewportSize.y);
-    beginRenderToTexture();
-    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void OpenGLRenderAdapter::shutdown()
+void NvrhiRenderAdapter::runFrames(const std::function<void()>& frame)
 {
-    LOG_INFO("OpenGL shutting down");
+    gpu->run(frame);
+}
 
-    if (m_autoSaveEnabled)
-    {
-        saveCurrentScene();
-    }
+void NvrhiRenderAdapter::shutdown()
+{
+    if (!m_window) return;
 
-    // Clear resources
-    for (auto &[mesh, vao]: meshVAOs)
-    {
-        glDeleteVertexArrays(1, &vao);
-    }
-    for (auto &[mesh, vbo]: meshVBOs)
-    {
-        glDeleteBuffers(1, &vbo);
-    }
-    for (auto &[mesh, ebo]: meshEBOs)
-    {
-        glDeleteBuffers(1, &ebo);
-    }
-    meshVAOs.clear();
-    meshVBOs.clear();
-    meshEBOs.clear();
+    if (m_autoSaveEnabled && m_world) saveCurrentScene();
 
-    // Meshes still alive (resource cache, leaked worlds) must not call into a dead context
-    if (Mesh::gpuReleaseContext == this)
-    {
-        Mesh::gpuReleaseHook = nullptr;
-        Mesh::gpuReleaseContext = nullptr;
-    }
+    Mesh::gpuReleaseContext = nullptr;
+    Mesh::gpuReleaseHook = nullptr;
 
-    // Programs belong to their materials; this is only the last one bound
-    m_shaderProgram = nullptr;
-
+    Logger::instance().setLogCallback({});
     shutdownImGui();
 
-    if (m_window)
-    {
-        glfwDestroyWindow(m_window);
-        m_window = nullptr;
-    }
-    glfwTerminate();
+    gpu.reset();
+    g_instance = nullptr;
+    m_window = nullptr;
 }
 
-void OpenGLRenderAdapter::framebufferSizeCallback(GLFWwindow *window, int width, int height)
+void NvrhiRenderAdapter::framebufferSizeCallback(GLFWwindow *window, int width, int height)
 {
     if (g_instance)
     {
@@ -213,7 +148,7 @@ void OpenGLRenderAdapter::framebufferSizeCallback(GLFWwindow *window, int width,
     }
 }
 
-void OpenGLRenderAdapter::onKey(int key, int action)
+void NvrhiRenderAdapter::onKey(int key, int action)
 {
     KeyEvent event;
     event.keyCode = static_cast<KeyCode>(key);
@@ -250,7 +185,7 @@ void OpenGLRenderAdapter::onKey(int key, int action)
     keyEvents.push_back(event);
 }
 
-void OpenGLRenderAdapter::onMouseButton(int button, int action)
+void NvrhiRenderAdapter::onMouseButton(int button, int action)
 {
     MouseButtonEvent event;
     event.button = button;
@@ -272,7 +207,7 @@ void OpenGLRenderAdapter::onMouseButton(int button, int action)
     mouseButtonEvents.push_back(event);
 }
 
-void OpenGLRenderAdapter::onMouseMove(double x, double y)
+void NvrhiRenderAdapter::onMouseMove(double x, double y)
 {
     MouseMoveEvent event;
     event.x = x;
@@ -280,7 +215,7 @@ void OpenGLRenderAdapter::onMouseMove(double x, double y)
     mouseMoveEvents.push_back(event);
 }
 
-void OpenGLRenderAdapter::onMouseScroll(double xoffset, double yoffset)
+void NvrhiRenderAdapter::onMouseScroll(double xoffset, double yoffset)
 {
     MouseScrollEvent event;
     event.xOffset = xoffset;
@@ -288,56 +223,17 @@ void OpenGLRenderAdapter::onMouseScroll(double xoffset, double yoffset)
     mouseScrollEvents.push_back(event);
 }
 
-uint32_t OpenGLRenderAdapter::createTexture(const TextureData& data)
+uint32_t NvrhiRenderAdapter::createTexture(const TextureData& data)
 {
-    ZoneScopedN("GL::createTexture");
-
-    if (!data.pixels || data.width <= 0 || data.height <= 0) 
-    {
-        LOG_ERROR("OpenGLRenderAdapter: Invalid texture data");
-        return 0;
-    }
-
-    uint32_t textureID;
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, data.getInternalFormat(),
-        data.width, data.height, 0,
-        data.getPixelFormat(), GL_UNSIGNED_BYTE, data.pixels);
-
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) 
-    {
-        LOG_ERROR("OpenGLRenderAdapter: OpenGL error while creating texture: " + error);
-        glDeleteTextures(1, &textureID);
-        return 0;
-    }
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    LOG_INFO("OpenGLRenderAdapter: Created texture with ID=" + std::to_string(textureID) + " | Size: " + std::to_string(data.width) + "x" + std::to_string(data.height));
-
-    return textureID;
+    return gpu->uploadTexture(data);
 }
 
-void OpenGLRenderAdapter::destroyTexture(uint32_t handle)
+void NvrhiRenderAdapter::destroyTexture(uint32_t handle)
 {
-    if (handle != 0) 
-    {
-        GLuint textureID = handle;
-        glDeleteTextures(1, &textureID);
-    }
+    gpu->destroyTexture(handle);
 }
 
-void OpenGLRenderAdapter::initImGui()
+void NvrhiRenderAdapter::initImGui()
 {
     IMGUI_CHECKVERSION();
 
@@ -345,13 +241,13 @@ void OpenGLRenderAdapter::initImGui()
     ImGuiIO& io = ImGui::GetIO();
 
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+
 
     ImGui::StyleColorsDark();
 
-    ImGui_ImplGlfw_InitForOpenGL(m_window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    ImGui_ImplGlfw_InitForOther(m_window, true);
+    gpu->initGui();
 
     Logger::instance().setLogCallback([](LogLevel level, const std::string& message) {
         if (g_instance) 
@@ -362,191 +258,93 @@ void OpenGLRenderAdapter::initImGui()
 
     AssetsUtils::scanAssetsDirectory("assets", m_currentDirectory, m_currentDirectoryContent);
 
-    LOG_INFO("OpenGLRenderAdapter: ImGui initialized");
+    LOG_INFO("NvrhiRenderAdapter: ImGui initialized");
 }
 
-void OpenGLRenderAdapter::beginImGuiFrame()
+void NvrhiRenderAdapter::beginImGuiFrame()
 {
-    ImGui_ImplOpenGL3_NewFrame();
+
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGuizmo::BeginFrame();
 }
 
-void OpenGLRenderAdapter::endImGuiFrame()
+void NvrhiRenderAdapter::endImGuiFrame()
 {
     ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-    }
+    gpu->drawGui(*ImGui::GetDrawData());
+
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
+
+    gpu->resizeScene(int(m_sceneImageSize.x), int(m_sceneImageSize.y));
 }
 
-void OpenGLRenderAdapter::shutdownImGui()
+void NvrhiRenderAdapter::shutdownImGui()
 {
-    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::DestroyPlatformWindows();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    LOG_INFO("OpenGLRenderAdapter: ImGui shutdown");
+    LOG_INFO("NvrhiRenderAdapter: ImGui shutdown");
 }
 
-void OpenGLRenderAdapter::setModelMatrix(const float *matrix)
+void NvrhiRenderAdapter::setModelMatrix(const float *matrix)
 {
     currentModelMatrix = glm::make_mat4(matrix);
-    glUniformMatrix4fv(m_shaderProgram->uniforms.modelMatrix, 1, GL_FALSE, matrix);
 }
 
-void OpenGLRenderAdapter::setViewMatrix(const float *matrix)
+void NvrhiRenderAdapter::setViewMatrix(const float *matrix)
 {
     currentViewMatrix = glm::make_mat4(matrix);
-    glUniformMatrix4fv(m_shaderProgram->uniforms.viewMatrix, 1, GL_FALSE, matrix);
 }
 
-void OpenGLRenderAdapter::setProjectionMatrix(const float *matrix)
+void NvrhiRenderAdapter::setProjectionMatrix(const float *matrix)
 {
     currentProjectionMatrix = glm::make_mat4(matrix);
-    glUniformMatrix4fv(m_shaderProgram->uniforms.projectionMatrix, 1, GL_FALSE, matrix);
 }
 
-void OpenGLRenderAdapter::setNormalMatrix(const float *matrix)
+void NvrhiRenderAdapter::setNormalMatrix(const float *matrix)
 {
     currentNormalMatrix = glm::make_mat4(matrix);
-    glUniformMatrix4fv(m_shaderProgram->uniforms.normalMatrix, 1, GL_FALSE, matrix);
 }
 
-float OpenGLRenderAdapter::getAspectRatio()
+float NvrhiRenderAdapter::getAspectRatio()
 {
-    return (float) m_width / m_height;
+    if (m_sceneImageSize.y > 0)
+        return m_sceneImageSize.x / m_sceneImageSize.y;
+    return float(m_width) / std::max(1, m_height);
 }
 
-void OpenGLRenderAdapter::setShaderProgram(const ShaderProgram* shaderProgram)
+void NvrhiRenderAdapter::setShaderProgram(const ShaderProgram* shaderProgram)
 {
     m_shaderProgram = shaderProgram;
-    glUseProgram(m_shaderProgram->programId);
+
 }
 
-void OpenGLRenderAdapter::setMaterial(const Material *material)
+void NvrhiRenderAdapter::setMaterial(const Material *material)
 {
     currentMaterial = material;
 
-    if (m_shaderProgram->uniforms.materialDiffuseColor != -1)
-    {
-        glUniform4f(m_shaderProgram->uniforms.materialDiffuseColor,
-                    material->diffuseColor.r, material->diffuseColor.g,
-                    material->diffuseColor.b, material->diffuseColor.a);
-    }
-
-    if (m_shaderProgram->uniforms.materialSpecularColor != -1)
-    {
-        glUniform4f(m_shaderProgram->uniforms.materialSpecularColor,
-                    material->specularColor.r, material->specularColor.g,
-                    material->specularColor.b, material->specularColor.a);
-    }
-
-    if (m_shaderProgram->uniforms.materialAmbientColor != -1)
-    {
-        glUniform4f(m_shaderProgram->uniforms.materialAmbientColor,
-                    material->ambientColor.r, material->ambientColor.g,
-                    material->ambientColor.b, material->ambientColor.a);
-    }
-
-    if (m_shaderProgram->uniforms.materialShininess != -1)
-    {
-        glUniform1f(m_shaderProgram->uniforms.materialShininess, material->shininess);
-    }
-
-    if (m_shaderProgram->uniforms.materialHasTexture != -1)
-    {
-        glUniform1i(m_shaderProgram->uniforms.materialHasTexture, material->hasTexture ? 1 : 0);
-    }
-
-    if (material->hasTexture)
-    {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, material->diffuseTexture->m_handle);
-        glUniform1i(m_shaderProgram->uniforms.texture, 0);
-    }
 }
 
-void OpenGLRenderAdapter::setLights(const std::vector<Light *> &lights)
+void NvrhiRenderAdapter::setLights(const std::vector<Light*>& lights)
 {
     currentLights = lights;
-
-    int numLights = std::min((int) lights.size(), 8);
-    glUniform1i(m_shaderProgram->uniforms.numLights, numLights);
-
-    for (int i = 0; i < numLights; i++)
-    {
-        const Light *light = lights[i];
-
-        if (m_shaderProgram->uniforms.lightTypes[i] != -1)
-        {
-            glUniform1i(m_shaderProgram->uniforms.lightTypes[i], static_cast<int>(light->type));
-        }
-
-        if (m_shaderProgram->uniforms.lightColors[i] != -1)
-        {
-            glUniform3f(m_shaderProgram->uniforms.lightColors[i], light->color.r, light->color.g, light->color.b);
-        }
-
-        if (m_shaderProgram->uniforms.lightIntensities[i] != -1)
-        {
-            glUniform1f(m_shaderProgram->uniforms.lightIntensities[i], light->intensity);
-        }
-
-        if (m_shaderProgram->uniforms.lightPositions[i] != -1)
-        {
-            glUniform3f(m_shaderProgram->uniforms.lightPositions[i], light->position.x, light->position.y, light->position.z);
-        }
-
-        if (m_shaderProgram->uniforms.lightDirections[i] != -1)
-        {
-            glUniform3f(m_shaderProgram->uniforms.lightDirections[i], light->direction.x, light->direction.y, light->direction.z);
-        }
-
-        if (m_shaderProgram->uniforms.lightConstants[i] != -1)
-        {
-            glUniform1f(m_shaderProgram->uniforms.lightConstants[i], light->constant);
-        }
-
-        if (m_shaderProgram->uniforms.lightLinears[i] != -1)
-        {
-            glUniform1f(m_shaderProgram->uniforms.lightLinears[i], light->linear);
-        }
-
-        if (m_shaderProgram->uniforms.lightQuadratics[i] != -1)
-        {
-            glUniform1f(m_shaderProgram->uniforms.lightQuadratics[i], light->quadratic);
-        }
-
-        if (m_shaderProgram->uniforms.lightCutOffs[i] != -1)
-        {
-            glUniform1f(m_shaderProgram->uniforms.lightCutOffs[i], light->cutOff);
-        }
-
-        if (m_shaderProgram->uniforms.lightOuterCutOffs[i] != -1)
-        {
-            glUniform1f(m_shaderProgram->uniforms.lightOuterCutOffs[i], light->outerCutOff);
-        }
-    }
 }
 
-void OpenGLRenderAdapter::beginDebugDraw()
+void NvrhiRenderAdapter::beginDebugDraw()
 {
     m_debugVertices.clear();
 }
 
-void OpenGLRenderAdapter::endDebugDraw()
+void NvrhiRenderAdapter::endDebugDraw()
 {
     flushDebugDraw();
 }
 
-void OpenGLRenderAdapter::drawDebugLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color)
+void NvrhiRenderAdapter::drawDebugLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color)
 {
     DebugVertex v1{ start, color };
     DebugVertex v2{ end, color };
@@ -554,7 +352,7 @@ void OpenGLRenderAdapter::drawDebugLine(const glm::vec3& start, const glm::vec3&
     m_debugVertices.push_back(v2);
 }
 
-void OpenGLRenderAdapter::drawDebugAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color)
+void NvrhiRenderAdapter::drawDebugAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color)
 {
     glm::vec3 corners[8] = 
     {
@@ -577,7 +375,7 @@ void OpenGLRenderAdapter::drawDebugAABB(const glm::vec3& min, const glm::vec3& m
     }
 }
 
-void OpenGLRenderAdapter::drawDebugSphere(const glm::vec3& center, float radius, const glm::vec4& color, int segments)
+void NvrhiRenderAdapter::drawDebugSphere(const glm::vec3& center, float radius, const glm::vec4& color, int segments)
 {
     auto drawCircle = [&](const glm::vec3& axis1, const glm::vec3& axis2) {
         for (int i = 0; i < segments; ++i) 
@@ -597,119 +395,38 @@ void OpenGLRenderAdapter::drawDebugSphere(const glm::vec3& center, float radius,
     drawCircle(glm::vec3(0, 1, 0), glm::vec3(0, 0, 1));
 }
 
-void OpenGLRenderAdapter::drawMesh(const Mesh *mesh)
+void NvrhiRenderAdapter::drawMesh(const Mesh *mesh)
 {
     if (!mesh || !mesh->ready)
         return;
 
-    createMeshVAO(const_cast<Mesh*>(mesh));
-
-    GLuint VAO = meshVAOs[const_cast<Mesh*>(mesh)];
-    glBindVertexArray(VAO);
-
-    if (!mesh->indices.empty())
+    if (m_shaderProgram && currentMaterial)
     {
-        glDrawElements(GL_TRIANGLES, mesh->indexCount, GL_UNSIGNED_INT, 0);
+        gpu->drawMesh(
+            *mesh, 
+            *m_shaderProgram, 
+            *currentMaterial, 
+            currentLights,
+            currentModelMatrix, 
+            currentViewMatrix, 
+            currentProjectionMatrix, 
+            currentNormalMatrix
+        );
     }
-    else
-    {
-        glDrawArrays(GL_TRIANGLES, 0, mesh->vertexCount);
-    }
-
-    glm::mat4 viewMatrix = currentViewMatrix;
-    glm::vec3 cameraPosition = glm::vec3(
-        -viewMatrix[3][0] * viewMatrix[0][0] - viewMatrix[3][1] * viewMatrix[1][0] - viewMatrix[3][2] * viewMatrix[2][
-            0],
-            -viewMatrix[3][0] * viewMatrix[0][1] - viewMatrix[3][1] * viewMatrix[1][1] - viewMatrix[3][2] * viewMatrix[2][
-                1],
-                -viewMatrix[3][0] * viewMatrix[0][2] - viewMatrix[3][1] * viewMatrix[1][2] - viewMatrix[3][2] * viewMatrix[2][2]
-                );
-
-    GLint cameraPosLoc = m_shaderProgram->uniforms.cameraPosition;
-    if (cameraPosLoc != -1)
-    {
-        glUniform3f(cameraPosLoc, cameraPosition.x, cameraPosition.y, cameraPosition.z);
-    }
-
-    glBindVertexArray(0);
 }
 
-void OpenGLRenderAdapter::loadAssetIcons()
+void NvrhiRenderAdapter::loadAssetIcons()
 {
     auto folderIconResource = RESOURCE_MANAGER.load<Texture>("assets\\common\\icon_folder.png");
     auto modelIconResource = RESOURCE_MANAGER.load<Texture>("assets\\common\\icon_model.png");
 
-    m_folderIcon = (ImTextureID)(intptr_t)folderIconResource->get()->m_handle;
-    m_modelIcon = (ImTextureID)(intptr_t)modelIconResource->get()->m_handle;
+    if (folderIconResource && folderIconResource->get())
+        m_folderIcon = (ImTextureID)(intptr_t)folderIconResource->get()->m_handle;
+    if (modelIconResource && modelIconResource->get())
+        m_modelIcon = (ImTextureID)(intptr_t)modelIconResource->get()->m_handle;
 }
 
-void OpenGLRenderAdapter::createRenderTexture(int width, int height)
-{
-    if (width <= 0 || height <= 0) return;
-
-    m_textureWidth = width;
-    m_textureHeight = height;
-
-    glGenTextures(1, &m_renderTexture);
-    glBindTexture(GL_TEXTURE_2D, m_renderTexture);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glGenRenderbuffers(1, &m_depthBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_depthBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
-
-
-    glGenFramebuffers(1, &m_fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_renderTexture, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthBuffer);
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-    {
-        LOG_ERROR("Framebuffer is not complete!");
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    //LOG_INFO("Created render texture: %dx%d", width, height);
-}
-
-void OpenGLRenderAdapter::beginRenderToTexture()
-{
-    if (m_fbo == 0) return;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-    glViewport(0, 0, m_textureWidth, m_textureHeight);
-}
-
-void OpenGLRenderAdapter::endRenderToTexture()
-{
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    int windowWidth, windowHeight;
-    glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
-    glViewport(0, 0, windowWidth, windowHeight);
-}
-
-void OpenGLRenderAdapter::resizeRenderTexture(int width, int height)
-{
-    if (width == m_textureWidth && height == m_textureHeight) return;
-
-    if (m_renderTexture) glDeleteTextures(1, &m_renderTexture);
-    if (m_depthBuffer) glDeleteRenderbuffers(1, &m_depthBuffer);
-    if (m_fbo) glDeleteFramebuffers(1, &m_fbo);
-
-    createRenderTexture(width, height);
-}
-
-void OpenGLRenderAdapter::toggleScriptConsoleFocus()
+void NvrhiRenderAdapter::toggleScriptConsoleFocus()
 {
     InputHandler& input = InputHandler::getInstance();
 
@@ -730,7 +447,7 @@ void OpenGLRenderAdapter::toggleScriptConsoleFocus()
     m_scriptConsoleFocusChange = 1;
 }
 
-void OpenGLRenderAdapter::renderUI()
+void NvrhiRenderAdapter::renderUI()
 {
     if (m_scriptConsoleFocusChange < 0)
     {
@@ -758,13 +475,13 @@ void OpenGLRenderAdapter::renderUI()
     applyPendingDelete();
 }
 
-bool OpenGLRenderAdapter::canDeleteEntity(EntityId entity) const
+bool NvrhiRenderAdapter::canDeleteEntity(EntityId entity) const
 {
     // Play mode restores the scene on Stop, and scripts may hold the entity
     return !m_isPlaying && m_world && entity != INVALID_ENTITY && m_world->isValidEntity(entity);
 }
 
-void OpenGLRenderAdapter::requestDeleteEntity(EntityId entity)
+void NvrhiRenderAdapter::requestDeleteEntity(EntityId entity)
 {
     if (canDeleteEntity(entity))
     {
@@ -772,7 +489,7 @@ void OpenGLRenderAdapter::requestDeleteEntity(EntityId entity)
     }
 }
 
-void OpenGLRenderAdapter::applyPendingDelete()
+void NvrhiRenderAdapter::applyPendingDelete()
 {
     const EntityId entity = m_pendingDeleteEntity;
     m_pendingDeleteEntity = INVALID_ENTITY;
@@ -800,7 +517,7 @@ void OpenGLRenderAdapter::applyPendingDelete()
     LOG_INFO("Deleted entity: " + name + " (id: " + std::to_string(entity) + ")");
 }
 
-void OpenGLRenderAdapter::renderPrefabFieldsEditor()
+void NvrhiRenderAdapter::renderPrefabFieldsEditor()
 {
     // Follow the file until the user starts editing, then keep the local copy
     if (!m_editedPrefabDirty)
@@ -852,7 +569,7 @@ void OpenGLRenderAdapter::renderPrefabFieldsEditor()
     }
 }
 
-void OpenGLRenderAdapter::renderPrefabPanel()
+void NvrhiRenderAdapter::renderPrefabPanel()
 {
     if (!ImGui::Begin("Prefabs", &m_showPrefabs) || !m_prefabLibrary || !m_world)
     {
@@ -962,42 +679,41 @@ void OpenGLRenderAdapter::renderPrefabPanel()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderUIViewport()
+void NvrhiRenderAdapter::renderUIViewport()
 {
-    float aspectRatio = 16.0f / 9.0f;
-    ImGui::Begin("Viewport", nullptr, 
-        ImGuiWindowFlags_NoTitleBar);
+    if (!ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoTitleBar))
+    {
+        m_viewportHovered = false;
+        ImGui::End();
+        return;
+    }
 
     m_viewportSize = ImGui::GetContentRegionAvail();
     m_viewportHovered = ImGui::IsWindowHovered();
 
     ImVec2 imagePos = ImGui::GetCursorScreenPos();
-    ImVec2 imageSize;
+    const ImVec2 imageSize = m_viewportSize;
 
-    if (m_renderTexture != 0 && m_viewportSize.x > 0 && m_viewportSize.y > 0)
+    if (gpu->sceneTexture() != 0 && m_viewportSize.x > 0 && m_viewportSize.y > 0)
     {
-        float targetWidth = m_viewportSize.y * aspectRatio;
+        auto* host = static_cast<GLFWwindow*>(ImGui::GetWindowViewport()->PlatformHandle);
 
-        if (targetWidth <= m_viewportSize.x)
+        if (host)
         {
-            imageSize = ImVec2(targetWidth, m_viewportSize.y);
-            float offsetX = (m_viewportSize.x - targetWidth) * 0.5f;
-            imagePos.x += offsetX;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
-        }
-        else
-        {
-            imageSize = ImVec2(m_viewportSize.x, m_viewportSize.x / aspectRatio);
-            float offsetY = (m_viewportSize.y - imageSize.y) * 0.5f;
-            imagePos.y += offsetY;
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
+            int width, height, pixelWidth, pixelHeight;
+            glfwGetWindowSize(host, &width, &height);
+            glfwGetFramebufferSize(host, &pixelWidth, &pixelHeight);
+            if (width > 0 && height > 0 && pixelWidth > 0 && pixelHeight > 0)
+            {
+                m_sceneImageSize.x = std::max(1.f, std::round(imageSize.x * pixelWidth / width));
+                m_sceneImageSize.y = std::max(1.f, std::round(imageSize.y * pixelHeight / height));
+            }
         }
 
-        ImGui::Image((ImTextureID)(intptr_t)m_renderTexture, imageSize,
-            ImVec2(0, 1),
-            ImVec2(1, 0));
+        ImGui::Image((ImTextureID)(intptr_t)gpu->sceneTexture(), imageSize,
+            ImVec2(0, 0),
+            ImVec2(1, 1));
 
-        // Script HUD over the game image
         if (ScriptSystem* scripts = ScriptEngine::getInstance().getActiveSystem())
         {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -1122,7 +838,7 @@ void OpenGLRenderAdapter::renderUIViewport()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::applyCursorLock()
+void NvrhiRenderAdapter::applyCursorLock()
 {
     InputHandler& input = InputHandler::getInstance();
 
@@ -1154,7 +870,7 @@ void OpenGLRenderAdapter::applyCursorLock()
     input.skipNextMouseDelta();
 }
 
-void OpenGLRenderAdapter::drawScreenFlash(const glm::vec3& color, float alpha, ImVec2 imagePos, ImVec2 imageSize)
+void NvrhiRenderAdapter::drawScreenFlash(const glm::vec3& color, float alpha, ImVec2 imagePos, ImVec2 imageSize)
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     auto withAlpha = [&](float value)
@@ -1176,7 +892,7 @@ void OpenGLRenderAdapter::drawScreenFlash(const glm::vec3& color, float alpha, I
     drawList->AddRectFilledMultiColor(ImVec2(max.x - bandX, min.y), max, clear, edge, edge, clear);
 }
 
-void OpenGLRenderAdapter::drawCenterMessage(const std::string& message, ImVec2 imagePos, ImVec2 imageSize)
+void NvrhiRenderAdapter::drawCenterMessage(const std::string& message, ImVec2 imagePos, ImVec2 imageSize)
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     ImFont* font = ImGui::GetFont();
@@ -1217,7 +933,7 @@ void OpenGLRenderAdapter::drawCenterMessage(const std::string& message, ImVec2 i
     }
 }
 
-void OpenGLRenderAdapter::drawCrosshair(ImVec2 imagePos, ImVec2 imageSize)
+void NvrhiRenderAdapter::drawCrosshair(ImVec2 imagePos, ImVec2 imageSize)
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 center(imagePos.x + imageSize.x * 0.5f, imagePos.y + imageSize.y * 0.5f);
@@ -1236,7 +952,7 @@ void OpenGLRenderAdapter::drawCrosshair(ImVec2 imagePos, ImVec2 imageSize)
     }
 }
 
-void OpenGLRenderAdapter::selectEntityAt(ImVec2 imagePos, ImVec2 imageSize)
+void NvrhiRenderAdapter::selectEntityAt(ImVec2 imagePos, ImVec2 imageSize)
 {
     if (!m_world || imageSize.x <= 0.0f || imageSize.y <= 0.0f) return;
 
@@ -1252,7 +968,7 @@ void OpenGLRenderAdapter::selectEntityAt(ImVec2 imagePos, ImVec2 imageSize)
     m_selectedEntity = RayCast::pickMesh(*m_world, ray, hit) ? hit.entity : -1;
 }
 
-void OpenGLRenderAdapter::renderSceneHierarchy()
+void NvrhiRenderAdapter::renderSceneHierarchy()
 {
     ImGui::Begin("Scene Hierarchy");
 
@@ -1287,7 +1003,7 @@ void OpenGLRenderAdapter::renderSceneHierarchy()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderInspector()
+void NvrhiRenderAdapter::renderInspector()
 {
     ImGui::Begin("Inspector");
 
@@ -1493,7 +1209,10 @@ void OpenGLRenderAdapter::renderInspector()
             ImGui::Separator();
 
             ImGui::DragFloat("Field of View", &camera->fov, 0.5f, 1.0f, 120.0f);
-            ImGui::DragFloat("Aspect Ratio", &camera->aspectRatio, 0.01f, 0.1f, 3.0f);
+            if (camera->isActive)
+                ImGui::Text("Aspect Ratio (viewport): %.3f", getAspectRatio());
+            else
+                ImGui::DragFloat("Aspect Ratio", &camera->aspectRatio, 0.01f, 0.1f, 3.0f);
             ImGui::DragFloat("Near Plane", &camera->nearPlane, 0.01f, 0.01f, 10.0f);
             ImGui::DragFloat("Far Plane", &camera->farPlane, 1.0f, 10.0f, 1000.0f);
 
@@ -1502,7 +1221,7 @@ void OpenGLRenderAdapter::renderInspector()
             if (ImGui::Button("Reset to Default"))
             {
                 camera->fov = 45.0f;
-                camera->aspectRatio = 16.0f / 9.0f;
+                camera->aspectRatio = getAspectRatio();
                 camera->nearPlane = 0.1f;
                 camera->farPlane = 100.0f;
             }
@@ -1528,16 +1247,18 @@ void OpenGLRenderAdapter::renderInspector()
                 auto vertShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.vert");
                 auto fragShader = RESOURCE_MANAGER.load<Shader>("Shaders/Default.frag");
 
-                auto cubeMesh = MeshFactory::createCube();
+                if (vertShader && fragShader)
+                {
+                    auto cubeMesh = MeshFactory::createCube();
 
-                auto defaultMaterial = std::make_shared<Material>(
-                    glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
-                    vertShader->get(),
-                    fragShader->get(),
-                    *this
-                );
+                    auto defaultMaterial = std::make_shared<Material>(
+                        glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+                        vertShader->get(),
+                        fragShader->get()
+                    );
 
-                m_world->getComponentPool<MeshRenderer>().addComponent(m_selectedEntity, MeshRenderer{ cubeMesh, defaultMaterial });
+                    m_world->getComponentPool<MeshRenderer>().addComponent(m_selectedEntity, MeshRenderer{ cubeMesh, defaultMaterial });
+                }
             }
         }
 
@@ -1556,7 +1277,7 @@ void OpenGLRenderAdapter::renderInspector()
             if (ImGui::MenuItem("Add Camera"))
             {
                 Camera cam;
-                cam.aspectRatio = 16.0f / 9.0f;
+                cam.aspectRatio = getAspectRatio();
                 cam.fov = 45.0f;
                 cam.nearPlane = 0.1f;
                 cam.farPlane = 100.0f;
@@ -1706,7 +1427,7 @@ void OpenGLRenderAdapter::renderInspector()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderStatistics()
+void NvrhiRenderAdapter::renderStatistics()
 {
     ImGui::Begin("Statistics");
 
@@ -1728,6 +1449,7 @@ void OpenGLRenderAdapter::renderStatistics()
     }
 
     ImGui::Text("FPS: %d", m_currentFPS);
+    ImGui::Text("Scene resolution: %.0f x %.0f", m_sceneImageSize.x, m_sceneImageSize.y);
     ImGui::Text("Frame Time: %.2f ms", deltaTime * 1000.0f);
 
 #ifdef NDEBUG
@@ -1769,7 +1491,7 @@ void OpenGLRenderAdapter::renderStatistics()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderMainMenuBar()
+void NvrhiRenderAdapter::renderMainMenuBar()
 {
     m_showSaveAsScenePanel = false;
     m_showLoadScenePanel = false;
@@ -1884,7 +1606,7 @@ void OpenGLRenderAdapter::renderMainMenuBar()
     renderAboutWindow();
 }
 
-void OpenGLRenderAdapter::renderAboutWindow()
+void NvrhiRenderAdapter::renderAboutWindow()
 {
     if (!m_showAbout) return;
 
@@ -1898,7 +1620,7 @@ void OpenGLRenderAdapter::renderAboutWindow()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderSaveSceneAsPanel()
+void NvrhiRenderAdapter::renderSaveSceneAsPanel()
 {
     if (ImGui::BeginPopupModal("SaveSceneAsPanel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
@@ -1920,7 +1642,7 @@ void OpenGLRenderAdapter::renderSaveSceneAsPanel()
     }
 }
 
-void OpenGLRenderAdapter::renderLoadScenePanel()
+void NvrhiRenderAdapter::renderLoadScenePanel()
 {
     if (ImGui::BeginPopupModal("LoadScenePanel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
@@ -1942,7 +1664,7 @@ void OpenGLRenderAdapter::renderLoadScenePanel()
     }
 }
 
-void OpenGLRenderAdapter::renderTransformEditor(Transform& transform)
+void NvrhiRenderAdapter::renderTransformEditor(Transform& transform)
 {
     ImGui::DragFloat3("Position", glm::value_ptr(transform.position), 0.1f);
 
@@ -1955,7 +1677,7 @@ void OpenGLRenderAdapter::renderTransformEditor(Transform& transform)
     ImGui::DragFloat3("Scale", glm::value_ptr(transform.scale), 0.1f, 0.01f);
 }
 
-void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
+void NvrhiRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
 {
     ImGui::SetNextWindowPos(ImVec2(position.x, position.y + TOOLBAR_OFFSET));
     ImGui::SetNextWindowSize(ImVec2(size.x, TOOLBAR_HEIGHT));
@@ -2026,7 +1748,7 @@ void OpenGLRenderAdapter::renderToolbar(ImVec2 position, ImVec2 size)
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderLogPanel()
+void NvrhiRenderAdapter::renderLogPanel()
 {
     ImGui::Begin("Log Console");
 
@@ -2098,7 +1820,7 @@ void OpenGLRenderAdapter::renderLogPanel()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::renderScriptConsole()
+void NvrhiRenderAdapter::renderScriptConsole()
 {
     ImGui::SetNextWindowSize(ImVec2(600.0f, 320.0f), ImGuiCond_FirstUseEver);
     if (m_scriptConsoleFocusChange > 0)
@@ -2178,7 +1900,7 @@ void OpenGLRenderAdapter::renderScriptConsole()
     bool reclaimFocus = false;
     ImGui::PushItemWidth(-FLT_MIN);
     if (ImGui::InputText("##ScriptConsoleInput", m_scriptConsoleInput, sizeof(m_scriptConsoleInput),
-        flags, &OpenGLRenderAdapter::scriptConsoleInputCallback, this))
+        flags, &NvrhiRenderAdapter::scriptConsoleInputCallback, this))
     {
         m_scriptConsole.submit(m_scriptConsoleInput, m_selectedEntity);
         m_scriptConsoleInput[0] = '\0';
@@ -2197,9 +1919,9 @@ void OpenGLRenderAdapter::renderScriptConsole()
     ImGui::End();
 }
 
-int OpenGLRenderAdapter::scriptConsoleInputCallback(ImGuiInputTextCallbackData* data)
+int NvrhiRenderAdapter::scriptConsoleInputCallback(ImGuiInputTextCallbackData* data)
 {
-    auto* self = static_cast<OpenGLRenderAdapter*>(data->UserData);
+    auto* self = static_cast<NvrhiRenderAdapter*>(data->UserData);
 
     if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
     {
@@ -2233,7 +1955,7 @@ int OpenGLRenderAdapter::scriptConsoleInputCallback(ImGuiInputTextCallbackData* 
     return 0;
 }
 
-void OpenGLRenderAdapter::renderAssetBrowser()
+void NvrhiRenderAdapter::renderAssetBrowser()
 {
     ZoneScopedN("AssetBrowser::render");
 
@@ -2466,14 +2188,14 @@ void OpenGLRenderAdapter::renderAssetBrowser()
     ImGui::End();
 }
 
-void OpenGLRenderAdapter::SizeCallback(ImGuiSizeCallbackData* data)
+void NvrhiRenderAdapter::SizeCallback(ImGuiSizeCallbackData* data)
 {
     float aspectRatio = *(float*)data->UserData;
     float newHeight = data->DesiredSize.x / aspectRatio;
     data->DesiredSize.y = newHeight;
 }
 
-void OpenGLRenderAdapter::addLogEntry(LogLevel level, const std::string& message)
+void NvrhiRenderAdapter::addLogEntry(LogLevel level, const std::string& message)
 {
     auto now = std::chrono::system_clock::now();
     std::time_t t = std::chrono::system_clock::to_time_t(now);
@@ -2517,7 +2239,7 @@ void OpenGLRenderAdapter::addLogEntry(LogLevel level, const std::string& message
     }
 }
 
-void OpenGLRenderAdapter::renderHierarchyNode(ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth)
+void NvrhiRenderAdapter::renderHierarchyNode(ComponentPool<Hierarchy>& hierarchies, ComponentPool<Transform>& transforms, EntityId entity, int depth)
 {
     std::string entityName = "Entity " + std::to_string(entity);
     if (m_world->getComponentPool<Tag>().hasComponent(entity))
@@ -2613,268 +2335,18 @@ void OpenGLRenderAdapter::renderHierarchyNode(ComponentPool<Hierarchy>& hierarch
     ImGui::PopID();
 }
 
-bool OpenGLRenderAdapter::initGLFW(int width, int height)
+void NvrhiRenderAdapter::onFramebufferResize(int width, int height)
 {
-    if (!glfwInit())
-    {
-        return false;
-    }
-
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-    LOG_INFO("Requesting OpenGL debug context");
-
-    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
-
-    m_window = glfwCreateWindow(mode->width, mode->height, "OpenGL Window", nullptr, nullptr);
-    if (!m_window)
-    {
-        return false;
-    }
-
-    glfwMakeContextCurrent(m_window);
-
-    glfwSetKeyCallback(m_window, keyCallback);
-    glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
-    glfwSetCursorPosCallback(m_window, cursorPosCallback);
-    glfwSetScrollCallback(m_window, scrollCallback);
-
-    glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
-
-    return true;
+    m_width = std::max(1, width);
+    m_height = std::max(1, height);
 }
 
-bool OpenGLRenderAdapter::initGLAD()
+void NvrhiRenderAdapter::flushDebugDraw()
 {
-    return gladLoadGLLoader((GLADloadproc) glfwGetProcAddress) != 0;
+    gpu->drawLines(m_debugVertices, currentViewMatrix, currentProjectionMatrix);
 }
 
-void OpenGLRenderAdapter::setupOpenGLState()
-{
-    glEnable(GL_DEPTH_TEST);
-
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
-}
-
-void OpenGLRenderAdapter::onFramebufferResize(int width, int height)
-{
-    if (width < 1) width = 1;
-    if (height < 1) height = 1;
-
-    m_width = width;
-    m_height = height;
-
-    glViewport(0, 0, width, height);
-}
-
-void OpenGLRenderAdapter::updateProjectionMatrix()
-{
-}
-
-void OpenGLRenderAdapter::createMeshVAO(Mesh *mesh)
-{
-    if (!mesh)
-        return;
-
-    if (meshVAOs.find(mesh) != meshVAOs.end())
-    {
-        return;
-    }
-
-    GLuint VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-    std::vector<float> interleavedData;
-    for (size_t i = 0; i < mesh->vertices.size(); i++)
-    {
-        interleavedData.push_back(mesh->vertices[i].x);
-        interleavedData.push_back(mesh->vertices[i].y);
-        interleavedData.push_back(mesh->vertices[i].z);
-
-        if (!mesh->normals.empty())
-        {
-            interleavedData.push_back(mesh->normals[i].x);
-            interleavedData.push_back(mesh->normals[i].y);
-            interleavedData.push_back(mesh->normals[i].z);
-        }
-        else
-        {
-            interleavedData.push_back(0.0f);
-            interleavedData.push_back(1.0f);
-            interleavedData.push_back(0.0f);
-        }
-
-        if (!mesh->texCoords.empty())
-        {
-            interleavedData.push_back(mesh->texCoords[i].x);
-            interleavedData.push_back(mesh->texCoords[i].y);
-        }
-        else
-        {
-            interleavedData.push_back(0.0f);
-            interleavedData.push_back(0.0f);
-        }
-    }
-
-    glBufferData(GL_ARRAY_BUFFER, interleavedData.size() * sizeof(float),
-                 interleavedData.data(), GL_STATIC_DRAW);
-
-    if (!mesh->indices.empty())
-    {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int),
-                     mesh->indices.data(), GL_STATIC_DRAW);
-    }
-
-    size_t stride = 8 * sizeof(float);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *) 0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *) (3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void *) (6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-
-    glBindVertexArray(0);
-
-    meshVAOs[mesh] = VAO;
-    meshVBOs[mesh] = VBO;
-    meshEBOs[mesh] = EBO;
-
-    // Marks the mesh as having GPU buffers, so its destructor asks to free them
-    mesh->VAO = VAO;
-    mesh->VBO = VBO;
-    mesh->EBO = EBO;
-}
-
-void OpenGLRenderAdapter::releaseMeshBuffersHook(void* context, Mesh* mesh)
-{
-    static_cast<OpenGLRenderAdapter*>(context)->releaseMeshBuffers(mesh);
-}
-
-void OpenGLRenderAdapter::releaseMeshBuffers(Mesh* mesh)
-{
-    // Erase the keys too: a new mesh allocated at this address must get its own buffers
-    if (auto it = meshVAOs.find(mesh); it != meshVAOs.end())
-    {
-        glDeleteVertexArrays(1, &it->second);
-        meshVAOs.erase(it);
-    }
-    if (auto it = meshVBOs.find(mesh); it != meshVBOs.end())
-    {
-        glDeleteBuffers(1, &it->second);
-        meshVBOs.erase(it);
-    }
-    if (auto it = meshEBOs.find(mesh); it != meshEBOs.end())
-    {
-        glDeleteBuffers(1, &it->second);
-        meshEBOs.erase(it);
-    }
-}
-
-void OpenGLRenderAdapter::setupDebugBuffers()
-{
-    glGenVertexArrays(1, &m_debugVAO);
-    glGenBuffers(1, &m_debugVBO);
-
-    glBindVertexArray(m_debugVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_debugVBO);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(DebugVertex), (void*)offsetof(DebugVertex, position));
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(DebugVertex), (void*)offsetof(DebugVertex, color));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
-}
-
-void OpenGLRenderAdapter::flushDebugDraw()
-{
-    if (m_debugVertices.empty()) return;
-
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glLineWidth(2.0f);
-
-    glUseProgram(m_debugShaderProgram);
-
-    int viewLoc = glGetUniformLocation(m_debugShaderProgram, "uView");
-    int projLoc = glGetUniformLocation(m_debugShaderProgram, "uProjection");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(currentViewMatrix));
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(currentProjectionMatrix));
-
-    glBindBuffer(GL_ARRAY_BUFFER, m_debugVBO);
-    glBufferData(GL_ARRAY_BUFFER, m_debugVertices.size() * sizeof(DebugVertex),
-        m_debugVertices.data(), GL_DYNAMIC_DRAW);
-
-    glBindVertexArray(m_debugVAO);
-    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_debugVertices.size()));
-
-    glBindVertexArray(0);
-    glDisable(GL_BLEND);
-}
-
-void OpenGLRenderAdapter::createDebugShader()
-{
-    auto compileShader = [](const char* source, GLenum type) -> unsigned int {
-        unsigned int shader = glCreateShader(type);
-        glShaderSource(shader, 1, &source, nullptr);
-        glCompileShader(shader);
-
-        int success;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-        if (!success) 
-        {
-            char infoLog[512];
-            glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-            LOG_INFO("Debug shader compilation error: " + std::string(infoLog));
-        }
-        return shader;
-    };
-
-    unsigned int vertexShader = compileShader(debugVertexShaderSource, GL_VERTEX_SHADER);
-    unsigned int fragmentShader = compileShader(debugFragmentShaderSource, GL_FRAGMENT_SHADER);
-
-    m_debugShaderProgram = glCreateProgram();
-    glAttachShader(m_debugShaderProgram, vertexShader);
-    glAttachShader(m_debugShaderProgram, fragmentShader);
-    glLinkProgram(m_debugShaderProgram);
-
-    int success;
-    glGetProgramiv(m_debugShaderProgram, GL_LINK_STATUS, &success);
-    if (!success) 
-    {
-        char infoLog[512];
-        glGetProgramInfoLog(m_debugShaderProgram, 512, nullptr, infoLog);
-        LOG_INFO("Debug shader linking error: " + std::string(infoLog));
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-}
-
-void OpenGLRenderAdapter::saveCurrentScene()
+void NvrhiRenderAdapter::saveCurrentScene()
 {
     if (m_world && !m_currentScenePath.empty())
     {
@@ -2887,7 +2359,7 @@ void OpenGLRenderAdapter::saveCurrentScene()
     }
 }
 
-void OpenGLRenderAdapter::loadLastScene()
+void NvrhiRenderAdapter::loadLastScene()
 {
     if (std::filesystem::exists(m_currentScenePath))
     {
@@ -2895,7 +2367,7 @@ void OpenGLRenderAdapter::loadLastScene()
     }
 }
 
-void OpenGLRenderAdapter::assetBrowserNavigateUp()
+void NvrhiRenderAdapter::assetBrowserNavigateUp()
 {
     if (m_currentDirectory != "assets" && m_currentDirectory != ".")
     {
@@ -2904,45 +2376,22 @@ void OpenGLRenderAdapter::assetBrowserNavigateUp()
     }
 }
 
-bool OpenGLRenderAdapter::shouldClose() const
+bool NvrhiRenderAdapter::shouldClose() const
 {
     return glfwWindowShouldClose(m_window);
 }
 
-void OpenGLRenderAdapter::compileShaders()
-{
-    
-}
-
-bool OpenGLRenderAdapter::checkShaderCompileErrors(unsigned int shader, const std::string &type)
-{
-    int success;
-    char infoLog[1024];
-
-    if (type != "PROGRAM")
-    {
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-            LOG_ERROR("Shader compilation error: " + std::string(infoLog));
-            return false;
-        }
-    }
-    return true;
-}
-
-void OpenGLRenderAdapter::pollEvents()
+void NvrhiRenderAdapter::clearEvents()
 {
     keyEvents.clear();
     mouseButtonEvents.clear();
     mouseMoveEvents.clear();
     mouseScrollEvents.clear();
 
-    glfwPollEvents();
+
 }
 
-void OpenGLRenderAdapter::keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
+void NvrhiRenderAdapter::keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     if (g_instance)
     {
@@ -2950,7 +2399,7 @@ void OpenGLRenderAdapter::keyCallback(GLFWwindow *window, int key, int scancode,
     }
 }
 
-void OpenGLRenderAdapter::mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
+void NvrhiRenderAdapter::mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
     if (g_instance)
     {
@@ -2958,7 +2407,7 @@ void OpenGLRenderAdapter::mouseButtonCallback(GLFWwindow *window, int button, in
     }
 }
 
-void OpenGLRenderAdapter::cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
+void NvrhiRenderAdapter::cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 {
     if (g_instance)
     {
@@ -2966,7 +2415,7 @@ void OpenGLRenderAdapter::cursorPosCallback(GLFWwindow *window, double xpos, dou
     }
 }
 
-void OpenGLRenderAdapter::scrollCallback(GLFWwindow *window, double xoffset, double yoffset)
+void NvrhiRenderAdapter::scrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
     if (g_instance)
     {
@@ -2974,73 +2423,7 @@ void OpenGLRenderAdapter::scrollCallback(GLFWwindow *window, double xoffset, dou
     }
 }
 
-unsigned int OpenGLRenderAdapter::compileShaderSource(const std::string& source, ShaderType type)
+unsigned int NvrhiRenderAdapter::compileShaderSource(const std::string& source, ShaderType type)
 {
-    GLenum glType = GL_VERTEX_SHADER;
-
-    if (type == ShaderType::Fragment)
-    {
-        glType = GL_FRAGMENT_SHADER;
-    }
-
-    GLuint shader = glCreateShader(glType);
-
-    const char* src = source.c_str();
-    glShaderSource(shader, 1, &src, nullptr);
-    glCompileShader(shader);
-
-    int success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-
-    if (!success)
-    {
-        char infoLog[1024];
-        glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
-
-        LOG_ERROR("OpenGL shader compile error:\n" + std::string(infoLog));
-
-        glDeleteShader(shader);
-        return 0;
-    }
-
-    LOG_INFO("Shader compiled successfully");
-
-    return shader;
-}
-
-unsigned int OpenGLRenderAdapter::linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader)
-{
-    GLuint program = glCreateProgram();
-
-    glAttachShader(program, vertexShader);
-    glAttachShader(program, fragmentShader);
-    glLinkProgram(program);
-
-    int success;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-
-    if (!success)
-    {
-        char infoLog[1024];
-        glGetProgramInfoLog(program, 1024, nullptr, infoLog);
-
-        LOG_ERROR("OpenGL shader link error:\n" + std::string(infoLog));
-
-        glDeleteProgram(program);
-        return 0;
-    }
-
-    LOG_INFO("Shader program linked successfully");
-
-    return program;
-}
-
-void OpenGLRenderAdapter::deleteShaderObject(unsigned int shader)
-{
-    glDeleteShader(shader);
-}
-
-void OpenGLRenderAdapter::deleteShaderProgram(unsigned int program)
-{
-    glDeleteProgram(program);
+    return gpu->compileShader(source, type);
 }

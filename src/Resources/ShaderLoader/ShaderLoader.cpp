@@ -7,7 +7,7 @@
 #include <sstream>
 #include "ShaderLoader.h"
 #include "Resources/ResourceManager.h"
-#include "OpenGLRenderAdapter.h"
+
 #include "tracy/Tracy.hpp"
 
 bool ShaderLoader::readSource(const std::string& shaderPath, ShaderSource& out)

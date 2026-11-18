@@ -46,7 +46,7 @@ class Coin(engine.Behaviour):
             return
 
         self._time += dt * self.bob_speed
-        self._angle = (self._angle + self.spin_speed * dt* 50) % 360.0
+        self._angle = (self._angle + self.spin_speed * dt) % 360.0
         y = self._y + math.sin(self._time) * self.bob_height
 
         self._entity.rotation = engine.Vec3(0.0, self._angle, 0.0)

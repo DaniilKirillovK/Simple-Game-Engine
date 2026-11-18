@@ -27,10 +27,7 @@ struct Mesh
 
     bool ready = true;
 
-    // OpenGL buffers: owned by the render adapter, set when the mesh is first drawn
-    unsigned int VAO = 0;
-    unsigned int VBO = 0;
-    unsigned int EBO = 0;
+    mutable bool buffersUploaded = false;
     unsigned int vertexCount = 0;
     unsigned int indexCount = 0;
 
@@ -53,7 +50,7 @@ struct Mesh
     ~Mesh()
     {
         // Only drawn meshes have buffers, and those are drawn and destroyed on the main thread
-        if (VAO != 0 && gpuReleaseHook)
+        if (buffersUploaded && gpuReleaseHook)
         {
             gpuReleaseHook(gpuReleaseContext, this);
         }

@@ -1,6 +1,8 @@
 #pragma once
 #include "IRenderAdapter.h"
-#include <glad/glad.h>
+#define GLFW_INCLUDE_NONE
+#include <unordered_map>
+class GpuRenderer;
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <mutex>
@@ -26,19 +28,18 @@ struct DebugVertex
 
 struct ShaderProgram;
 
-class OpenGLRenderAdapter : public IRenderAdapter
+class NvrhiRenderAdapter : public IRenderAdapter
 {
 public:
-    OpenGLRenderAdapter();
-    virtual ~OpenGLRenderAdapter();
+    explicit NvrhiRenderAdapter(bool vulkan, bool verify);
+    void runFrames(const std::function<void()>& frame) override;
+    virtual ~NvrhiRenderAdapter();
 
     virtual bool initialize(int width, int height) override;
     virtual void render(World* world) override;
     virtual void shutdown() override;
     virtual bool shouldClose() const override;
-    virtual void compileShaders() override;
-    virtual bool checkShaderCompileErrors(unsigned int shader, const std::string& type) override;
-    virtual void pollEvents() override;
+    virtual void clearEvents() override;
 
     virtual std::vector<KeyEvent> getKeyEvents() override { return keyEvents; }
     virtual std::vector<MouseButtonEvent> getMouseButtonEvents() override { return mouseButtonEvents; }
@@ -46,9 +47,6 @@ public:
     virtual std::vector<MouseScrollEvent> getMouseScrollEvents() override { return mouseScrollEvents; }
 
     virtual unsigned int compileShaderSource(const std::string& source, ShaderType type) override;
-    virtual unsigned int linkShaderProgram(unsigned int vertexShader, unsigned int fragmentShader) override;
-    virtual void deleteShaderObject(unsigned int shader) override;
-    virtual void deleteShaderProgram(unsigned int program) override;
 
     virtual void initImGui() override;
     virtual void beginImGuiFrame() override;
@@ -114,12 +112,6 @@ private:
     std::function<void()> m_onCreateEmptyCallback;
     std::function<void(std::shared_ptr<Mesh>, const std::string&)> m_onCreateFromAssetCallback;
 
-    void createRenderTexture(int width, int height);
-    void beginRenderToTexture();
-    void endRenderToTexture();
-    unsigned int getRenderTexture() const { return m_renderTexture; }
-    void resizeRenderTexture(int width, int height);
-
     void renderUI();
     void renderUIViewport();
     void selectEntityAt(ImVec2 imagePos, ImVec2 imageSize);
@@ -158,22 +150,9 @@ private:
     void applyPendingDelete();
     EntityId m_pendingDeleteEntity = INVALID_ENTITY;
 
-    bool initGLFW(int width, int height);
-    bool initGLAD();
-    void setupOpenGLState();
-
     void onFramebufferResize(int width, int height);
-    
-    void updateProjectionMatrix();
-
-    void createMeshVAO(Mesh* mesh);
-    // Called from ~Mesh through Mesh::gpuReleaseHook
-    static void releaseMeshBuffersHook(void* context, Mesh* mesh);
-    void releaseMeshBuffers(Mesh* mesh);
-
-    void setupDebugBuffers();
     void flushDebugDraw();
-    void createDebugShader();
+    std::unique_ptr<GpuRenderer> gpu;
 
     // Scene
     void setCurrentScenePath(const std::string& path) { m_currentScenePath = path; }
@@ -235,10 +214,6 @@ private:
     // ShaderLoader & buffers
     const ShaderProgram* m_shaderProgram;
 
-    std::unordered_map<Mesh*, GLuint> meshVAOs;
-    std::unordered_map<Mesh*, GLuint> meshVBOs;
-    std::unordered_map<Mesh*, GLuint> meshEBOs;
-
     GLFWwindow* m_window;
     int m_width;
     int m_height;
@@ -247,11 +222,6 @@ private:
     float m_fpsAccumulator = 0.0f;
     int m_currentFPS = 0;
 
-    unsigned int m_fbo = 0;
-    unsigned int m_renderTexture = 0;
-    unsigned int m_depthBuffer = 0;
-    int m_textureWidth = 0;
-    int m_textureHeight = 0;
     EntityId m_selectedEntity = -1;
 
     int m_gizmoOperation = 0;
@@ -259,9 +229,6 @@ private:
 
     // Debug
     bool m_showDebugColliders = true;
-    unsigned int m_debugVAO = 0;
-    unsigned int m_debugVBO = 0;
-    unsigned int m_debugShaderProgram = 0;
     std::vector<DebugVertex> m_debugVertices;
 
     // Log
@@ -293,6 +260,7 @@ private:
     std::shared_ptr<Mesh> m_selectedMesh;
     Texture* m_selectedTexture = nullptr;
 
+    ImVec2 m_sceneImageSize{};
     ImVec2 m_viewportSize = ImVec2(0, 0);
     bool m_viewportHovered = false;
 

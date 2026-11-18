@@ -233,8 +233,7 @@ EntityId GameplayState::createMeshEntity(std::shared_ptr<Mesh> mesh, const std::
     auto material = std::make_shared<Material>(
         color,
         vertShader->get(),
-        fragShader->get(),
-        m_renderer
+        fragShader->get()
     );
 
     const EntityId e = m_world->createEntity();

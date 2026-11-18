@@ -45,9 +45,6 @@ struct TextureData
 
     void cleanup();
 
-    uint32_t getInternalFormat() const;
-
-    uint32_t getPixelFormat() const;
 };
 
 struct Texture 
@@ -102,6 +99,4 @@ public:
 
     bool isValid() const { return m_handle != 0; }
 
-    void bind(int slot = 0) const;
-    void unbind() const;
 };

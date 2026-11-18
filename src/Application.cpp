@@ -1,6 +1,6 @@
 #include "Application.h"
 #include "GameplayState.h"
-#include "OpenGLRenderAdapter.h"
+#include "NvrhiRenderAdapter.h"
 #include "Resources/ResourceManager.h"
 #include "Resources/AssetLoader.h"
 #include "Resources/MeshLoader/MeshLoader.h"
@@ -27,11 +27,11 @@ Application::~Application()
     JobSystem::shutdown();
 }
 
-bool Application::initialize(int width, int height, const std::string& title)
+bool Application::initialize(int width, int height, bool vulkan, bool verify)
 {
     LOG_INFO("Initializing application...");
 
-    renderer = std::make_unique<OpenGLRenderAdapter>();
+    renderer = std::make_unique<NvrhiRenderAdapter>(vulkan, verify);
     if (!renderer->initialize(width, height)) 
     {
         LOG_ERROR("Failed to initialize renderer");
@@ -59,7 +59,7 @@ bool Application::initialize(int width, int height, const std::string& title)
 void Application::run()
 {
     LOG_INFO("Entering main loop");
-    while (running && !renderer->shouldClose()) 
+    renderer->runFrames([this]()
     {
         auto currentTime = std::chrono::high_resolution_clock::now();
         float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
@@ -70,7 +70,7 @@ void Application::run()
         render();
 
         FrameMark;
-    }
+    });
     LOG_INFO("Main loop finished");
 }
 
@@ -96,13 +96,13 @@ void Application::handleEvents()
     ZoneScoped;
 
     InputHandler::getInstance().update();
-    renderer->pollEvents();
 
     auto keyEvents = renderer->getKeyEvents();
     auto mouseButtonEvents = renderer->getMouseButtonEvents();
     auto mouseMoveEvents = renderer->getMouseMoveEvents();
     auto mouseScrollEvents = renderer->getMouseScrollEvents();
 
+    renderer->clearEvents();
     InputHandler::getInstance().processKeyEvents(keyEvents);
     InputHandler::getInstance().processMouseButtonEvents(mouseButtonEvents);
     InputHandler::getInstance().processMouseMoveEvents(mouseMoveEvents);

@@ -57,8 +57,8 @@
                 "bob_speed": 2.5,
                 "pickup_effect": "shot_impact",
                 "pickup_margin": 0.25,
-                "spin_speed": 150.0,
-                "value": 100000
+                "spin_speed": 49.090999603271484,
+                "value": 100
             },
             "module": "coin"
         },

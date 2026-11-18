@@ -569,7 +569,7 @@ void SceneSerializer::deserializeMeshRenderer(IRenderAdapter& renderAdapter, Mes
         }
 
         auto material = std::make_shared<Material>(
-            diffuseColor, vertShader, fragShader, renderAdapter
+            diffuseColor, vertShader, fragShader
         );
 
         if (mat.contains("has_texture") && mat["has_texture"].get<bool>()) 

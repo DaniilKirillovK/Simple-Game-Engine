@@ -1,100 +1,32 @@
-#version 330 core
+#include "Scene.hlsli"
+Texture2D albedo : register(t0);
+SamplerState linearSampler : register(s0);
 
-in vec3 vWorldPosition;
-in vec3 vNormal;
-in vec2 vTexCoord;
-
-out vec4 FragColor;
-
-uniform vec4 uMaterialDiffuseColor;
-uniform vec4 uMaterialSpecularColor;
-uniform vec4 uMaterialAmbientColor;
-uniform float uMaterialShininess;
-uniform int uMaterialHasTexture;
-
-uniform sampler2D uTexture;
-
-// Light
-struct Light 
+float4 main(SceneVertex input) : SV_Target
 {
-    int type;      // 0-directional, 1-point, 2-spot
-    vec3 color;
-    float intensity;
-    vec3 position;
-    vec3 direction;
-    float constant;
-    float linear;
-    float quadratic;
-    float cutOff;
-    float outerCutOff;
-};
-
-uniform int uNumLights;
-uniform Light uLights[8];
-
-// Camera
-uniform vec3 uCameraPosition;
-
-void main() 
-{
-    vec3 normal = normalize(vNormal);
-    vec3 viewDir = normalize(uCameraPosition - vWorldPosition);
-
-    vec3 globalAmbient = vec3(0.2f);
-    vec3 result = vec3(0.0f);
-    
-    if (uMaterialHasTexture == 1)
+    float3 normal = normalize(input.normal);
+    float3 toEye = normalize(eye.xyz - input.world);
+    float3 result = hasTexture ? albedo.Sample(linearSampler, input.uv).rgb : diffuse.rgb * 0.2;
+    for (uint i = 0; i < lightCount; ++i)
     {
-        vec4 texColor = texture(uTexture, vTexCoord);
-        result = texColor.rgb; 
-    }
-    else
-    {
-        result = uMaterialDiffuseColor.rgb * globalAmbient;
-    }
-
-    for (int i = 0; i < uNumLights; i++)
-    {
-        Light light = uLights[i];
-
-        vec3 lightDir;
-        float attenuation = 1.0;
-
-        if (light.type == 0) 
-        { // Directional light
-            lightDir = normalize(-light.direction);
+        LightData light = lights[i];
+        float3 direction = normalize(-light.directionInner.xyz);
+        float attenuation = 1;
+        if (light.positionType.w > 0)
+        {
+            float3 delta = light.positionType.xyz - input.world;
+            float distance = length(delta);
+            float3 toLight = delta / max(distance, 0.00001);
+            attenuation = rcp(max(dot(light.falloffOuter.xyz, float3(1, distance, distance * distance)), 0.00001));
+            if (light.positionType.w == 2)
+                attenuation *= saturate((dot(toLight, direction) - light.falloffOuter.w)
+                    / max(light.directionInner.w - light.falloffOuter.w, 0.00001));
+            direction = toLight;
         }
-        else if (light.type == 1) 
-        { // Point light
-            vec3 lightVec = light.position - vWorldPosition;
-            float distance = length(lightVec);
-            lightDir = normalize(lightVec);
-            attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * distance * distance);
-        }
-        else 
-        { // Spot light
-            vec3 lightVec = light.position - vWorldPosition;
-            float distance = length(lightVec);
-            lightDir = normalize(lightVec);
-
-            float theta = dot(lightDir, normalize(-light.direction));
-            float epsilon = light.cutOff - light.outerCutOff;
-            float intensity = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
-
-            attenuation = intensity / (light.constant + light.linear * distance + light.quadratic * distance * distance);
-        }
-
-        // Diffuse
-        float diff = max(dot(normal, lightDir), 0.0);
-        vec3 diffuse = light.color * light.intensity * diff * uMaterialDiffuseColor.rgb;
-
-        // Specular
-        vec3 reflectDir = reflect(-lightDir, normal);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
-        vec3 specular = light.color * light.intensity * spec * uMaterialSpecularColor.rgb;
-
-        result += (diffuse + specular) * attenuation;
+        float lambert = saturate(dot(normal, direction));
+        float spec = pow(saturate(dot(toEye, reflect(-direction, normal))), specularShininess.w);
+        result += (diffuse.rgb * lambert + specularShininess.rgb * spec)
+            * light.colorIntensity.rgb * light.colorIntensity.w * attenuation;
     }
-
-    FragColor = vec4(result, uMaterialDiffuseColor.a);
+    return float4(result, diffuse.a);
 }

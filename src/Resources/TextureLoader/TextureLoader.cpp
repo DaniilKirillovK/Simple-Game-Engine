@@ -7,7 +7,7 @@
 #include <algorithm>
 #include "Logger.h"
 #include "Resources/ResourceManager.h"
-#include "OpenGLRenderAdapter.h"
+
 #include "tracy/Tracy.hpp"
 
 std::unique_ptr<TextureData> TextureLoader::loadFromFile(const std::string& path)
