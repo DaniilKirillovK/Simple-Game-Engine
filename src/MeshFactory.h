@@ -204,10 +204,12 @@ public:
             glm::vec2(0.0f, 1.0f)
         };
 
+        // Winding: counter-clockwise when seen from above (+Y), so the top of the
+        // plane is the front face under backface culling (FrontCounterClockwise=true).
         std::vector<unsigned int> indices = 
         {
-            0, 1, 2,
-            2, 3, 0
+            0, 2, 1,
+            2, 0, 3
         };
 
         mesh->vertices = vertices;
