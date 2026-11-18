@@ -181,12 +181,17 @@ void GameplayState::exitPlayMode()
 void GameplayState::setupTestScene()
 {
     std::string scenePath = "assets\\scenes\\lava_platformer.json";
+    const bool overridden = std::getenv("ENGINE_SCENE") != nullptr;
 
     // Test hook: run a different scene without touching the editor defaults.
-    if (const char* overridePath = std::getenv("ENGINE_SCENE"))
+    if (overridden)
     {
-        scenePath = overridePath;
+        scenePath = std::getenv("ENGINE_SCENE");
     }
+
+    // Log the exact scene file being used: an ENGINE_SCENE left over from a previous
+    // command silently substitutes the scene, so it must be visible in every log.
+    LOG_INFO("setupTestScene: scene path = " + scenePath + (overridden ? " (ENGINE_SCENE override)" : " (default)"));
 
     if (std::filesystem::exists(scenePath)) 
     {
@@ -198,6 +203,10 @@ void GameplayState::setupTestScene()
         {
             LOG_INFO("Scene loaded successfully from: " + scenePath);
         }
+    }
+    else
+    {
+        LOG_WARNING("setupTestScene: scene file not found: " + scenePath);
     }
 
     LOG_INFO("3D scene setup complete");

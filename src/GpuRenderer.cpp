@@ -95,55 +95,6 @@ std::string readShader(const char* path)
     return {std::istreambuf_iterator<char>(file), {}};
 }
 
-// Compares two P6 PPM files written by the verification passes: true when the pixel
-// payloads are identical, otherwise logs how many pixels differ and returns false.
-bool comparePpmPayloads(const std::string& pathA, const std::string& pathB)
-{
-    auto load = [](const std::string& path, uint32_t& width, uint32_t& height, std::vector<uint8_t>& rgb) -> bool
-    {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return false;
-
-        std::string magic;
-        int maxValue = 0;
-        if (!(file >> magic >> width >> height >> maxValue) || magic != "P6" || maxValue != 255)
-            return false;
-        file.get(); // single whitespace character between the header and the payload
-
-        rgb.resize(size_t(width) * height * 3);
-        file.read(reinterpret_cast<char*>(rgb.data()), rgb.size());
-        return file.gcount() == std::streamsize(rgb.size());
-    };
-
-    uint32_t widthA = 0, heightA = 0, widthB = 0, heightB = 0;
-    std::vector<uint8_t> pixelsA, pixelsB;
-    if (!load(pathA, widthA, heightA, pixelsA) || !load(pathB, widthB, heightB, pixelsB))
-    {
-        LOG_ERROR("Equivalence check: cannot read verification frames (" + pathA + ", " + pathB + ")");
-        return false;
-    }
-    if (widthA != widthB || heightA != heightB || pixelsA.size() != pixelsB.size())
-    {
-        LOG_ERROR("Equivalence check: frame sizes differ (" + pathA + " " + std::to_string(widthA) + "x"
-            + std::to_string(heightA) + " vs " + pathB + " " + std::to_string(widthB) + "x" + std::to_string(heightB) + ")");
-        return false;
-    }
-
-    size_t differingPixels = 0;
-    for (size_t i = 0; i + 2 < pixelsA.size(); i += 3)
-    {
-        if (pixelsA[i] != pixelsB[i] || pixelsA[i + 1] != pixelsB[i + 1] || pixelsA[i + 2] != pixelsB[i + 2])
-            ++differingPixels;
-    }
-
-    if (differingPixels != 0)
-    {
-        LOG_ERROR("Equivalence check: " + std::to_string(differingPixels) + " of " + std::to_string(pixelsA.size() / 3)
-            + " pixels differ between " + pathA + " and " + pathB);
-    }
-    return differingPixels == 0;
-}
-
 struct GpuRenderer::State
 {
     bool vulkan;
@@ -152,6 +103,17 @@ struct GpuRenderer::State
     unsigned frames = 0;
     bool errors = false;
     bool presentedEditorWindow = false;
+
+    // The scene background clear colour, the single source of truth for the
+    // "geometry pixels" metric (frame pixels that differ from it are geometry).
+    rhi::Color clearColor{ 0.1f, 0.1f, 0.15f, 1 };
+
+    // In-memory frame comparison between verification passes: pass 0 stores its RGB
+    // payload, pass 1 compares against it while the frame is still on the CPU.
+    std::vector<uint8_t> verifyPass0Rgb;
+    bool verifyEquivalenceRan = false;
+    bool verifyEquivalenceEqual = true;
+    size_t verifyDifferingPixels = 0;
 
     std::unique_ptr<DeviceManager> manager;
 
@@ -664,7 +626,7 @@ void GpuRenderer::run(const std::function<void()>& frame)
         s.statsCounters = {};
         s.instanceBufferCursor = 0;
         s.indirectArgsCursor = 0;
-        s.commands->clearTextureFloat(s.color, rhi::AllSubresources, rhi::Color(0.1f, 0.1f, 0.15f, 1));
+        s.commands->clearTextureFloat(s.color, rhi::AllSubresources, s.clearColor);
         s.commands->clearDepthStencilTexture(s.depth, rhi::AllSubresources, true, 1.f, false, 0);
 
         auto rendered = s.color;
@@ -701,25 +663,70 @@ void GpuRenderer::run(const std::function<void()>& frame)
             std::ofstream image(file, std::ios::binary);
             image << "P6\n" << desc.width << ' ' << desc.height << "\n255\n";
 
+            // "Geometry pixels" = pixels that differ from the clear colour. The clear
+            // colour is the frame background by construction, so this count is a real
+            // measure of how much of the frame is covered by geometry (scene-independent).
+            const uint8_t bgR = uint8_t(s.clearColor.r * 255.0f);
+            const uint8_t bgG = uint8_t(s.clearColor.g * 255.0f);
+            const uint8_t bgB = uint8_t(s.clearColor.b * 255.0f);
+
             size_t visible = 0;
-            std::vector<char> rgb(desc.width * 3);
+            std::vector<uint8_t> frame(desc.width * desc.height * 3);
             for (uint32_t y = 0; y < desc.height; ++y)
             {
                 auto* row = pixels + pitch * y;
                 for (uint32_t x = 0; x < desc.width; ++x)
                 {
                     auto* p = row + x * 4;
-                    visible += p[0] != pixels[0] || p[1] != pixels[1] || p[2] != pixels[2];
-                    std::memcpy(&rgb[x * 3], p, 3);
+                    visible += p[0] != bgR || p[1] != bgG || p[2] != bgB;
+                    const size_t offset = (size_t(y) * desc.width + x) * 3;
+                    frame[offset] = p[0];
+                    frame[offset + 1] = p[1];
+                    frame[offset + 2] = p[2];
                 }
-                image.write(rgb.data(), rgb.size());
             }
+            image.write(reinterpret_cast<const char*>(frame.data()), frame.size());
 
             s.device->unmapStagingTexture(readback);
+
+            // Equivalence check: compare the passes in memory while this frame is on
+            // the CPU. The PPM files stay only as human-readable artifacts.
+            if (s.verifyPass == 0)
+            {
+                s.verifyPass0Rgb = std::move(frame);
+            }
+            else
+            {
+                s.verifyEquivalenceRan = true;
+                if (frame.size() != s.verifyPass0Rgb.size())
+                {
+                    s.verifyEquivalenceEqual = false;
+                    s.verifyDifferingPixels = std::max(frame.size(), s.verifyPass0Rgb.size()) / 3;
+                }
+                else
+                {
+                    size_t differing = 0;
+                    for (size_t i = 0; i + 2 < frame.size(); i += 3)
+                    {
+                        if (frame[i] != s.verifyPass0Rgb[i]
+                            || frame[i + 1] != s.verifyPass0Rgb[i + 1]
+                            || frame[i + 2] != s.verifyPass0Rgb[i + 2])
+                        {
+                            ++differing;
+                        }
+                    }
+                    s.verifyDifferingPixels = differing;
+                    s.verifyEquivalenceEqual = differing == 0;
+                }
+            }
+
             if (!image || visible < 100 || s.meshes.empty() || s.errors)
                 throw std::runtime_error("Scene verification failed (see engine.log)");
 
-            LOG_INFO("Verified GPU scene (pass " + std::to_string(s.verifyPass) + ") with " + std::to_string(visible) + " varying pixels");
+            LOG_INFO("Verified GPU scene (pass " + std::to_string(s.verifyPass) + ") with " + std::to_string(visible)
+                + " geometry pixels (frame " + std::to_string(desc.width) + "x" + std::to_string(desc.height)
+                + ", clear colour " + std::to_string(int(bgR)) + "," + std::to_string(int(bgG))
+                + "," + std::to_string(int(bgB)) + ")");
             LOG_INFO("Draw stats: regular=" + std::to_string(s.statsCounters.regularDraws)
                 + " instanced=" + std::to_string(s.statsCounters.instancedDraws)
                 + " indirect=" + std::to_string(s.statsCounters.indirectDraws)
@@ -900,13 +907,31 @@ void GpuRenderer::setVerifyPass(int pass)
     state->frames = 0;
     state->errors = false;
     state->batchInfoLogged = false;
+    state->verifyEquivalenceRan = false;
+    state->verifyEquivalenceEqual = true;
+    state->verifyDifferingPixels = 0;
+    if (pass == 0)
+    {
+        state->verifyPass0Rgb.clear();
+    }
 }
 
 bool GpuRenderer::compareVerifyFrames() const
 {
     auto& s = *state;
-    const std::string api = s.vulkan ? "scene-vulkan" : "scene-d3d12";
-    return comparePpmPayloads(api + ".ppm", api + "-off.ppm");
+    if (!s.verifyEquivalenceRan)
+    {
+        LOG_ERROR("Equivalence check: no in-memory comparison was recorded");
+        return false;
+    }
+    if (s.verifyEquivalenceEqual)
+    {
+        LOG_INFO("Equivalence check: frames compared in memory, pixel-identical");
+        return true;
+    }
+    LOG_ERROR("Equivalence check: " + std::to_string(s.verifyDifferingPixels) + " of "
+        + std::to_string(s.verifyPass0Rgb.size() / 3) + " pixels differ between the passes");
+    return false;
 }
 
 void GpuRenderer::drawLines(const std::vector<DebugVertex>& lines, const glm::mat4& view, const glm::mat4& projection)

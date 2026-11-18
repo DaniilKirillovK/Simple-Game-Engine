@@ -203,7 +203,7 @@ void NvrhiRenderAdapter::runFrames(const std::function<void()>& frame)
         throw std::runtime_error("Instancing equivalence check FAILED (see engine.log)");
     }
 
-    LOG_INFO("Instancing equivalence check PASSED: both passes are pixel-identical");
+    LOG_INFO("Instancing equivalence check PASSED: both passes are pixel-identical (compared in memory)");
 }
 
 void NvrhiRenderAdapter::shutdown()

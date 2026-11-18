@@ -47,11 +47,11 @@ public:
 
     // Verification support: pass 0 renders with the current settings and writes
     // scene-<api>.ppm, pass 1 (set by the adapter for the equivalence check) renders
-    // with instancing disabled and writes scene-<api>-off.ppm.
+    // with instancing disabled and writes scene-<api>-off.ppm. The passes are compared
+    // in memory while the pass-1 frame is on the CPU; the PPM files are artifacts only.
     void setVerifyPass(int pass);
 
-    // Compares the two verification passes (scene-<api>.ppm vs scene-<api>-off.ppm).
-    // Returns true when the pixel payloads are identical.
+    // Returns the in-memory comparison verdict recorded during pass 1.
     bool compareVerifyFrames() const;
 
 private:
