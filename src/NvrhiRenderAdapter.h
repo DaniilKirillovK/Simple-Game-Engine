@@ -41,6 +41,12 @@ public:
     virtual bool shouldClose() const override;
     virtual void clearEvents() override;
 
+    // Headless mode for the automated render test: no window, no ImGui, manual frames.
+    bool initializeHeadless(int width, int height);
+    void runFramesHeadless(const std::function<void()>& frame, uint32_t frameCount);
+    bool readSceneToMemory(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height);
+    bool isHeadless() const { return m_headless; }
+
     virtual std::vector<KeyEvent> getKeyEvents() override { return keyEvents; }
     virtual std::vector<MouseButtonEvent> getMouseButtonEvents() override { return mouseButtonEvents; }
     virtual std::vector<MouseMoveEvent> getMouseMoveEvents() override { return mouseMoveEvents; }
@@ -181,6 +187,7 @@ private:
     bool m_editedPrefabDirty = false;
 
     World* m_world;
+    bool m_headless = false;
     bool m_isPlaying = false;
 
     // Panels

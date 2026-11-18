@@ -99,6 +99,7 @@ struct GpuRenderer::State
 {
     bool vulkan;
     bool verify;
+    bool headless = false;
     unsigned frames = 0;
     bool errors = false;
     bool presentedEditorWindow = false;
@@ -290,21 +291,7 @@ GpuRenderer::~GpuRenderer()
 GLFWwindow* GpuRenderer::initialize(int width, int height)
 {
     auto& s = *state;
-    donut::log::EnableOutputToMessageBox(false);
-    donut::log::SetCallback([&s](donut::log::Severity severity, const char* message) {
-        if (severity >= donut::log::Severity::Error || std::strstr(message, "Validation Error:")) 
-        { 
-            s.errors = true; LOG_ERROR(message); 
-        }
-        else if (severity == donut::log::Severity::Warning) 
-        { 
-            LOG_WARNING(message); 
-        }
-        else 
-        { 
-            LOG_INFO(message); 
-        }
-    });
+    setupLogCallback();
 
     if (s.vulkan)
     {
@@ -353,11 +340,45 @@ GLFWwindow* GpuRenderer::initialize(int width, int height)
     s.device = s.manager->GetDevice();
     LOG_INFO(std::string(s.vulkan ? "Vulkan: " : "Direct3D 12: ") + s.manager->GetRendererString());
 
+    if (!setupCommonResources())
+    {
+        return nullptr;
+    }
+
+    glfwGetFramebufferSize(s.manager->GetWindow(), &width, &height);
+    resizeScene(std::max(1, width), std::max(1, height));
+    return s.manager->GetWindow();
+}
+
+void GpuRenderer::setupLogCallback()
+{
+    auto& s = *state;
+    donut::log::EnableOutputToMessageBox(false);
+    donut::log::SetCallback([&s](donut::log::Severity severity, const char* message) {
+        if (severity >= donut::log::Severity::Error || std::strstr(message, "Validation Error:")) 
+        { 
+            s.errors = true; LOG_ERROR(message); 
+        }
+        else if (severity == donut::log::Severity::Warning) 
+        { 
+            LOG_WARNING(message); 
+        }
+        else 
+        { 
+            LOG_INFO(message); 
+        }
+    });
+}
+
+bool GpuRenderer::setupCommonResources()
+{
+    auto& s = *state;
+
     if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&s.utils))) ||
         FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&s.compiler))) ||
         FAILED(s.utils->CreateDefaultIncludeHandler(&s.includes)))
     {
-        return nullptr;
+        return false;
     }
 
     s.commands = s.device->createCommandList();
@@ -373,14 +394,132 @@ GLFWwindow* GpuRenderer::initialize(int width, int height)
     s.overlay.vertex = compileShader(readShader("Shaders/Overlay.vert"), ShaderType::Vertex);
     s.overlay.pixel = compileShader(readShader("Shaders/Overlay.frag"), ShaderType::Fragment);
 
-    if (!s.overlay.vertex || !s.overlay.pixel)
+    return s.overlay.vertex && s.overlay.pixel;
+}
+
+bool GpuRenderer::initializeHeadless(int width, int height)
+{
+    auto& s = *state;
+    s.headless = true;
+    setupLogCallback();
+
+    s.manager.reset(DeviceManager::Create(s.vulkan ? rhi::GraphicsAPI::VULKAN : rhi::GraphicsAPI::D3D12));
+    if (!s.manager)
     {
-        return nullptr;
+        return false;
     }
 
-    glfwGetFramebufferSize(s.manager->GetWindow(), &width, &height);
-    resizeScene(std::max(1, width), std::max(1, height));
-    return s.manager->GetWindow();
+    donut::app::DeviceCreationParameters params;
+    params.backBufferWidth = width;
+    params.backBufferHeight = height;
+    params.enableNvrhiValidationLayer = true;
+
+    if (!s.vulkan)
+    {
+        // Pick the same discrete GPU as the editor: the adapter with the most
+        // dedicated video memory. Otherwise the headless device may land on the
+        // integrated GPU and the golden images become machine-configuration noise.
+        if (!s.manager->CreateInstance(params)) return false;
+
+        std::vector<donut::app::AdapterInfo> adapters;
+        if (!s.manager->EnumerateAdapters(adapters)) return false;
+
+        uint64_t bestMemory = 0;
+        for (size_t i = 0; i < adapters.size(); ++i)
+        {
+            const auto& adapter = adapters[i];
+            if (adapter.vendorID != 0x1414 && adapter.dedicatedVideoMemory > bestMemory)
+            {
+                bestMemory = adapter.dedicatedVideoMemory;
+                params.adapterIndex = int(i);
+            }
+        }
+    }
+
+    if (!s.manager->CreateHeadlessDevice(params))
+    {
+        LOG_ERROR("Headless device creation failed");
+        return false;
+    }
+
+    s.device = s.manager->GetDevice();
+    LOG_INFO(std::string(s.vulkan ? "Vulkan: " : "Direct3D 12: ") + s.manager->GetRendererString());
+
+    if (!setupCommonResources())
+    {
+        return false;
+    }
+
+    resizeScene(width, height);
+    return true;
+}
+
+void GpuRenderer::runHeadless(const std::function<void()>& frame, uint32_t frameCount)
+{
+    auto& s = *state;
+    for (uint32_t i = 0; i < frameCount; ++i)
+    {
+        s.commands->open();
+        s.commands->clearTextureFloat(s.color, rhi::AllSubresources, rhi::Color(0.1f, 0.1f, 0.15f, 1));
+        s.commands->clearDepthStencilTexture(s.depth, rhi::AllSubresources, true, 1.f, false, 0);
+        frame();
+        s.commands->close();
+        s.device->executeCommandList(s.commands);
+        s.device->waitForIdle();
+    }
+}
+
+bool GpuRenderer::readSceneToMemory(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height)
+{
+    auto& s = *state;
+    if (!s.color)
+    {
+        return false;
+    }
+
+    const auto desc = s.color->getDesc();
+    auto staging = s.device->createStagingTexture(desc, rhi::CpuAccessMode::Read);
+    if (!staging)
+    {
+        return false;
+    }
+
+    s.commands->open();
+    s.commands->copyTexture(staging, {}, s.color, {});
+    s.commands->close();
+    s.device->executeCommandList(s.commands);
+    s.device->waitForIdle();
+
+    size_t pitch = 0;
+    auto* pixels = static_cast<const unsigned char*>(s.device->mapStagingTexture(staging, {}, rhi::CpuAccessMode::Read, &pitch));
+    if (!pixels)
+    {
+        return false;
+    }
+
+    width = desc.width;
+    height = desc.height;
+    rgb.resize(size_t(width) * height * 3);
+    for (uint32_t y = 0; y < height; ++y)
+    {
+        const unsigned char* row = pixels + pitch * y;
+        for (uint32_t x = 0; x < width; ++x)
+        {
+            const unsigned char* p = row + size_t(x) * 4;
+            const size_t offset = (size_t(y) * width + x) * 3;
+            rgb[offset] = p[0];
+            rgb[offset + 1] = p[1];
+            rgb[offset + 2] = p[2];
+        }
+    }
+
+    s.device->unmapStagingTexture(staging);
+    return true;
+}
+
+bool GpuRenderer::isHeadless() const
+{
+    return state->headless;
 }
 
 uint32_t GpuRenderer::compileShader(const std::string& source, ShaderType type)

@@ -22,6 +22,12 @@ public:
     GLFWwindow* initialize(int width, int height);
     void run(const std::function<void()>& frame);
 
+    // Headless (no window, no swapchain) device for the automated render test.
+    bool initializeHeadless(int width, int height);
+    void runHeadless(const std::function<void()>& frame, uint32_t frameCount);
+    bool readSceneToMemory(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height);
+    bool isHeadless() const;
+
     uint32_t compileShader(const std::string& source, ShaderType type);
     uint32_t uploadTexture(const TextureData& data);
     void destroyTexture(uint32_t id);
@@ -40,4 +46,7 @@ public:
 private:
     struct State;
     std::unique_ptr<State> state;
+
+    void setupLogCallback();
+    bool setupCommonResources();
 };
