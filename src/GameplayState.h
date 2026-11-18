@@ -11,7 +11,7 @@ struct Mesh;
 class GameplayState : public IGameState 
 {
 public:
-    GameplayState(IRenderAdapter& renderer);
+    GameplayState(IRenderAdapter& renderer, bool verify = false);
 
     virtual void onEnter() override;
     virtual void onExit() override;
@@ -42,6 +42,10 @@ private:
     std::string m_savedScenePath;
 
     bool m_playModeActive = false;
+
+    // Verify mode (--verify): animation systems are disabled so that the scene is
+    // deterministic between the two verification passes.
+    bool m_verify = false;
 
     IRenderAdapter& m_renderer;
     World* m_world;

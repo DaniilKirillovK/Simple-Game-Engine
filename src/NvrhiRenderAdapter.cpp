@@ -58,6 +58,7 @@ NvrhiRenderAdapter::NvrhiRenderAdapter(bool vulkan, bool verify)
       , m_world(nullptr)
 {
     m_autoSaveEnabled = !verify;
+    m_verify = verify;
     g_instance = this;
     RenderApi::setAdapter(this);
 
@@ -96,6 +97,13 @@ NvrhiRenderAdapter::NvrhiRenderAdapter(bool vulkan, bool verify)
             if (end == all.size()) break;
             start = end + 1;
         }
+    }
+
+    // Debug/testing switch: run --verify as a single pass (skip the equivalence check).
+    if (std::getenv("ENGINE_VERIFY_SINGLE_PASS"))
+    {
+        m_verifySinglePass = true;
+        LOG_INFO("NvrhiRenderAdapter: single-pass verify via ENGINE_VERIFY_SINGLE_PASS");
     }
 }
 
@@ -173,7 +181,29 @@ void NvrhiRenderAdapter::render(World* world)
 
 void NvrhiRenderAdapter::runFrames(const std::function<void()>& frame)
 {
-    gpu->run(frame);
+    gpu->run(frame); // pass 0: throws when the scene verification itself fails
+
+    if (!m_verify || m_verifySinglePass)
+    {
+        return;
+    }
+
+    // Second verification pass with batching disabled. The frames must match the
+    // first pass pixel for pixel; otherwise the instanced path diverges from the
+    // per-object path and the process exits with a failure.
+    LOG_INFO("Equivalence check: second pass, instancing disabled");
+    setInstancingEnabled(false);
+    setIndirectDrawEnabled(false);
+    glfwSetWindowShouldClose(m_window, GLFW_FALSE);
+    gpu->setVerifyPass(1);
+    gpu->run(frame); // pass 1: throws when the scene verification itself fails
+
+    if (!gpu->compareVerifyFrames())
+    {
+        throw std::runtime_error("Instancing equivalence check FAILED (see engine.log)");
+    }
+
+    LOG_INFO("Instancing equivalence check PASSED: both passes are pixel-identical");
 }
 
 void NvrhiRenderAdapter::shutdown()
@@ -527,6 +557,11 @@ RenderStats NvrhiRenderAdapter::getRenderStats() const
 
 bool NvrhiRenderAdapter::loadScene(const std::string& path)
 {
+    if (m_isPlaying)
+    {
+        LOG_ERROR("loadScene: stop Play mode first");
+        return false;
+    }
     if (!m_world)
     {
         LOG_ERROR("loadScene: no active world");
@@ -2365,38 +2400,12 @@ void NvrhiRenderAdapter::SizeCallback(ImGuiSizeCallbackData* data)
 
 void NvrhiRenderAdapter::addLogEntry(LogLevel level, const std::string& message)
 {
-    auto now = std::chrono::system_clock::now();
-    std::time_t t = std::chrono::system_clock::to_time_t(now);
-    char timeStr[26];
-    ctime_s(timeStr, sizeof(timeStr), &t);
-    timeStr[24] = '\0';
-
-    std::string levelStr;
-    switch (level) 
-    {
-    case LogLevel::Info: 
-        levelStr = "INFO"; 
-        break;
-    case LogLevel::Warning: 
-        levelStr = "WARNING"; 
-        break;
-    case LogLevel::Error: 
-        levelStr = "ERROR"; 
-        break;
-    case LogLevel::ResourceManager: 
-        levelStr = "RESOURCEMANAGER"; 
-        break;
-    case LogLevel::ResourceManagerError: 
-        levelStr = "RESOURCEMANAGER ERROR"; 
-        break;
-    }
-
-    std::string formatted = "[" + std::string(timeStr) + "] [" + levelStr + "] " + message;
-
+    // The message arrives already formatted by Logger ("[time] [LEVEL] text"),
+    // so the panel shows it verbatim instead of adding a second timestamp.
     LogEntry entry;
-    entry.message = formatted;
+    entry.message = message;
     entry.level = level;
-    entry.timestamp = now;
+    entry.timestamp = std::chrono::system_clock::now();
 
     std::lock_guard<std::mutex> lock(m_logMutex);
     m_logEntries.push_back(entry);

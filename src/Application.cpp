@@ -45,7 +45,7 @@ bool Application::initialize(int width, int height, bool vulkan, bool verify)
 
     ScriptEngine::getInstance().initialize();
 
-    currentState = std::make_unique<GameplayState>(*renderer);
+    currentState = std::make_unique<GameplayState>(*renderer, verify);
     currentState->onEnter();
 
     bindActions();

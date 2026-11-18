@@ -21,8 +21,9 @@
 
 #include "tracy/Tracy.hpp"
 
-GameplayState::GameplayState(IRenderAdapter& renderer)
+GameplayState::GameplayState(IRenderAdapter& renderer, bool verify)
 : m_renderer(renderer),
+  m_verify(verify),
   m_prefabs(std::make_unique<PrefabLibrary>(renderer))
 {
     setupEditorCallbacks();
@@ -46,6 +47,24 @@ void GameplayState::onEnter()
         }));
     m_world->addSystem(std::make_unique<TransformSystem>());
     m_world->addSystem(std::make_unique<RenderSystem>(&m_renderer));
+
+    if (m_verify)
+    {
+        // Verification renders the scene twice (batching on/off) and compares the
+        // frames pixel for pixel: time-based animation must not run.
+        if (MovementSystem* movement = m_world->getSystem<MovementSystem>())
+        {
+            movement->setEnabled(false);
+        }
+        if (ScriptSystem* scripts = m_world->getSystem<ScriptSystem>())
+        {
+            scripts->setEnabled(false);
+        }
+        if (PhysicsSystem* physics = m_world->getSystem<PhysicsSystem>())
+        {
+            physics->setEnabled(false);
+        }
+    }
 
 	setupTestScene();
 
@@ -171,6 +190,10 @@ void GameplayState::setupTestScene()
 
     if (std::filesystem::exists(scenePath)) 
     {
+        // Track the loaded path in the renderer so the editor autosave writes back
+        // to this file instead of clobbering the default scene.
+        m_renderer.setScenePath(scenePath);
+
         if (SceneSerializer::loadScene(m_renderer, *m_world, scenePath))
         {
             LOG_INFO("Scene loaded successfully from: " + scenePath);

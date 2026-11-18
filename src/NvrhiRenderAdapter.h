@@ -107,6 +107,7 @@ private:
     virtual bool isIndirectDrawEnabled() const override { return m_indirectDrawEnabled; }
     virtual RenderStats getRenderStats() const override;
     virtual bool loadScene(const std::string& path) override;
+    virtual void setScenePath(const std::string& path) override { m_currentScenePath = path; }
 
     virtual void loadAssetIcons() override;
 
@@ -235,6 +236,10 @@ private:
     // Instancing / indirect draw feature switches
     bool m_instancingEnabled = true;
     bool m_indirectDrawEnabled = true;
+
+    // Verify mode (--verify) and its two-pass equivalence check
+    bool m_verify = false;
+    bool m_verifySinglePass = false;
 
     // Debug/testing hook: console commands from ENGINE_CONSOLE_CMD, one per frame.
     std::vector<std::string> m_pendingConsoleCommands;

@@ -197,6 +197,10 @@ void RenderSystem::update(World& world, float deltaTime)
     {
         // Batch renderers by (mesh data, material data): identical mesh + material = one draw call.
         std::map<BatchKey, Batch> batches;
+        // Draw order must match the per-object path exactly (depth ties at coplanar
+        // surfaces break by draw order), so batches are flushed in the order of
+        // their first occurrence in the entity iteration.
+        std::map<size_t, BatchKey> batchOrder;
 
         for (size_t i = 0; i < renderers.size(); ++i)
         {
@@ -242,6 +246,7 @@ void RenderSystem::update(World& world, float deltaTime)
             {
                 batch.mesh = r.mesh.get();
                 batch.material = r.material.get();
+                batchOrder[i] = key;
             }
 
             InstanceData instance;
@@ -250,8 +255,9 @@ void RenderSystem::update(World& world, float deltaTime)
             batch.instances.push_back(instance);
         }
 
-        for (auto& [key, batch] : batches)
+        for (auto& [index, key] : batchOrder)
         {
+            Batch& batch = batches[key];
             m_renderAdapter->setShaderProgram(&batch.material->shaderProgram);
             m_renderAdapter->setLights(m_lights);
             m_renderAdapter->setMaterial(batch.material);

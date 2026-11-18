@@ -111,6 +111,10 @@ public:
     // Loads a scene file into the live world (used by the editor and the script console).
     virtual bool loadScene(const std::string& path) = 0;
 
+    // Tracks the path of the currently loaded scene: the editor autosave writes back
+    // to this path, so it must always match the file that was actually loaded.
+    virtual void setScenePath(const std::string& path) = 0;
+
     virtual void loadAssetIcons() = 0;
 
     // Shader compile and linkage

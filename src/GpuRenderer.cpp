@@ -95,10 +95,60 @@ std::string readShader(const char* path)
     return {std::istreambuf_iterator<char>(file), {}};
 }
 
+// Compares two P6 PPM files written by the verification passes: true when the pixel
+// payloads are identical, otherwise logs how many pixels differ and returns false.
+bool comparePpmPayloads(const std::string& pathA, const std::string& pathB)
+{
+    auto load = [](const std::string& path, uint32_t& width, uint32_t& height, std::vector<uint8_t>& rgb) -> bool
+    {
+        std::ifstream file(path, std::ios::binary);
+        if (!file) return false;
+
+        std::string magic;
+        int maxValue = 0;
+        if (!(file >> magic >> width >> height >> maxValue) || magic != "P6" || maxValue != 255)
+            return false;
+        file.get(); // single whitespace character between the header and the payload
+
+        rgb.resize(size_t(width) * height * 3);
+        file.read(reinterpret_cast<char*>(rgb.data()), rgb.size());
+        return file.gcount() == std::streamsize(rgb.size());
+    };
+
+    uint32_t widthA = 0, heightA = 0, widthB = 0, heightB = 0;
+    std::vector<uint8_t> pixelsA, pixelsB;
+    if (!load(pathA, widthA, heightA, pixelsA) || !load(pathB, widthB, heightB, pixelsB))
+    {
+        LOG_ERROR("Equivalence check: cannot read verification frames (" + pathA + ", " + pathB + ")");
+        return false;
+    }
+    if (widthA != widthB || heightA != heightB || pixelsA.size() != pixelsB.size())
+    {
+        LOG_ERROR("Equivalence check: frame sizes differ (" + pathA + " " + std::to_string(widthA) + "x"
+            + std::to_string(heightA) + " vs " + pathB + " " + std::to_string(widthB) + "x" + std::to_string(heightB) + ")");
+        return false;
+    }
+
+    size_t differingPixels = 0;
+    for (size_t i = 0; i + 2 < pixelsA.size(); i += 3)
+    {
+        if (pixelsA[i] != pixelsB[i] || pixelsA[i + 1] != pixelsB[i + 1] || pixelsA[i + 2] != pixelsB[i + 2])
+            ++differingPixels;
+    }
+
+    if (differingPixels != 0)
+    {
+        LOG_ERROR("Equivalence check: " + std::to_string(differingPixels) + " of " + std::to_string(pixelsA.size() / 3)
+            + " pixels differ between " + pathA + " and " + pathB);
+    }
+    return differingPixels == 0;
+}
+
 struct GpuRenderer::State
 {
     bool vulkan;
     bool verify;
+    int verifyPass = 0;
     unsigned frames = 0;
     bool errors = false;
     bool presentedEditorWindow = false;
@@ -131,9 +181,11 @@ struct GpuRenderer::State
     rhi::BufferHandle instanceIdentity; // 1-instance identity data, bound when a shader reads no instances
     std::vector<rhi::BufferHandle> instanceBuffers; // one structured buffer per batch in a frame
     size_t instanceBufferCursor = 0;                // resets every frame
-    rhi::BufferHandle indirectArgs;     // growable indirect draw-arguments buffer
+    std::vector<rhi::BufferHandle> indirectArgBuffers; // one indirect-args buffer per batch in a frame
+    size_t indirectArgsCursor = 0;                     // resets every frame
 
     RenderStats statsCounters;
+    bool batchInfoLogged = false; // debug: one batch dump per verify pass
 
     ComPtr<IDxcUtils> utils;
     ComPtr<IDxcCompiler3> compiler;
@@ -253,19 +305,35 @@ struct GpuRenderer::State
         return buffer;
     }
 
-    // Uploads indirect draw arguments into a growable indirect-arguments buffer.
+    // Uploads indirect draw arguments into a pooled indirect-arguments buffer.
+    // Like the instance buffers, each batch in a frame gets its own buffer: nvrhi's
+    // D3D12 backend must not see several writeBuffer + executeIndirect cycles on
+    // one buffer within a single command list.
     rhi::IBuffer* indirect(const void* args, size_t bytes)
     {
-        if (!indirectArgs || indirectArgs->getDesc().byteSize < bytes)
+        const size_t capacity = std::max<size_t>(bytes, 256);
+        if (indirectArgsCursor >= indirectArgBuffers.size())
         {
-            auto desc = rhi::BufferDesc().setByteSize(std::max<size_t>(bytes, 256)).setIsDrawIndirectArgs(true)
+            auto desc = rhi::BufferDesc().setByteSize(capacity).setIsDrawIndirectArgs(true)
                 .enableAutomaticStateTracking(rhi::ResourceStates::IndirectArgument);
-            indirectArgs = device->createBuffer(desc);
-            if (!indirectArgs) 
+            auto buffer = device->createBuffer(desc);
+            if (!buffer) 
                 throw std::runtime_error("Cannot allocate indirect args buffer");
+            indirectArgBuffers.push_back(buffer);
         }
-        commands->writeBuffer(indirectArgs, args, bytes);
-        return indirectArgs;
+        else if (indirectArgBuffers[indirectArgsCursor]->getDesc().byteSize < bytes)
+        {
+            auto desc = rhi::BufferDesc().setByteSize(capacity).setIsDrawIndirectArgs(true)
+                .enableAutomaticStateTracking(rhi::ResourceStates::IndirectArgument);
+            auto buffer = device->createBuffer(desc);
+            if (!buffer) 
+                throw std::runtime_error("Cannot allocate indirect args buffer");
+            indirectArgBuffers[indirectArgsCursor] = buffer;
+        }
+
+        rhi::IBuffer* buffer = indirectArgBuffers[indirectArgsCursor++].Get();
+        commands->writeBuffer(buffer, args, bytes);
+        return buffer;
     }
 
     rhi::IBindingSet* binding(uint32_t texture, bool repeat, rhi::IBuffer* instanceData)
@@ -595,6 +663,7 @@ void GpuRenderer::run(const std::function<void()>& frame)
         s.commands->open();
         s.statsCounters = {};
         s.instanceBufferCursor = 0;
+        s.indirectArgsCursor = 0;
         s.commands->clearTextureFloat(s.color, rhi::AllSubresources, rhi::Color(0.1f, 0.1f, 0.15f, 1));
         s.commands->clearDepthStencilTexture(s.depth, rhi::AllSubresources, true, 1.f, false, 0);
 
@@ -626,7 +695,10 @@ void GpuRenderer::run(const std::function<void()>& frame)
                 throw std::runtime_error("Scene readback failed");
 
             auto& desc = rendered->getDesc();
-            std::ofstream image(s.vulkan ? "scene-vulkan.ppm" : "scene-d3d12.ppm", std::ios::binary);
+            std::string file = s.vulkan ? "scene-vulkan" : "scene-d3d12";
+            if (s.verifyPass == 1) file += "-off";
+            file += ".ppm";
+            std::ofstream image(file, std::ios::binary);
             image << "P6\n" << desc.width << ' ' << desc.height << "\n255\n";
 
             size_t visible = 0;
@@ -647,7 +719,7 @@ void GpuRenderer::run(const std::function<void()>& frame)
             if (!image || visible < 100 || s.meshes.empty() || s.errors)
                 throw std::runtime_error("Scene verification failed (see engine.log)");
 
-            LOG_INFO("Verified GPU scene with " + std::to_string(visible) + " varying pixels");
+            LOG_INFO("Verified GPU scene (pass " + std::to_string(s.verifyPass) + ") with " + std::to_string(visible) + " varying pixels");
             LOG_INFO("Draw stats: regular=" + std::to_string(s.statsCounters.regularDraws)
                 + " instanced=" + std::to_string(s.statsCounters.instancedDraws)
                 + " indirect=" + std::to_string(s.statsCounters.indirectDraws)
@@ -756,6 +828,16 @@ void GpuRenderer::drawMeshInstanced(const Mesh& mesh, const ShaderProgram& progr
     data.textured = material.hasTexture && s.textures.count(texture);
     s.commands->writeBuffer(s.constants, &data, sizeof(data));
 
+    if (s.verify && !s.batchInfoLogged)
+    {
+        s.batchInfoLogged = true;
+        LOG_INFO("instanced batch: instances=" + std::to_string(instances.size())
+            + " texture=" + std::to_string(texture)
+            + " textured=" + std::to_string(data.textured)
+            + " indices=" + std::to_string(buffers.indices ? mesh.indices.size() : 0)
+            + " vertices=" + std::to_string(mesh.vertices.size()));
+    }
+
     rhi::IBuffer* instanceData = s.instances(instances);
     auto graphics = s.graphics(Pass::Scene, program, data.textured ? texture : s.white, instanceData);
     graphics.addVertexBuffer(rhi::VertexBufferBinding().setBuffer(buffers.vertices));
@@ -810,6 +892,21 @@ void GpuRenderer::drawMeshInstanced(const Mesh& mesh, const ShaderProgram& progr
 RenderStats GpuRenderer::stats() const
 {
     return state->statsCounters;
+}
+
+void GpuRenderer::setVerifyPass(int pass)
+{
+    state->verifyPass = pass;
+    state->frames = 0;
+    state->errors = false;
+    state->batchInfoLogged = false;
+}
+
+bool GpuRenderer::compareVerifyFrames() const
+{
+    auto& s = *state;
+    const std::string api = s.vulkan ? "scene-vulkan" : "scene-d3d12";
+    return comparePpmPayloads(api + ".ppm", api + "-off.ppm");
 }
 
 void GpuRenderer::drawLines(const std::vector<DebugVertex>& lines, const glm::mat4& view, const glm::mat4& projection)
