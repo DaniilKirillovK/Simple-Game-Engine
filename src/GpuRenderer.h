@@ -1,5 +1,6 @@
 #pragma once
 #include "Resources/ShaderLoader/ShaderProgram.h"
+#include "IRenderAdapter.h"
 #include <glm/glm.hpp>
 #include <functional>
 #include <memory>
@@ -36,6 +37,13 @@ public:
     void drawMesh(const Mesh& mesh, const ShaderProgram& program, const Material& material,
         const std::vector<Light*>& lights, const glm::mat4& model, const glm::mat4& view,
         const glm::mat4& projection, const glm::mat4& normal);
+
+    // Instanced / indirect path: one draw call for all transforms of one mesh.
+    void drawMeshInstanced(const Mesh& mesh, const ShaderProgram& program, const Material& material,
+        const std::vector<Light*>& lights, const glm::mat4& view, const glm::mat4& projection,
+        const std::vector<InstanceData>& instances, bool indirect);
+
+    RenderStats stats() const;
 
 private:
     struct State;

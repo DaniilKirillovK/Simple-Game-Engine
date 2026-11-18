@@ -100,6 +100,14 @@ private:
 
     virtual void drawMesh(const Mesh* mesh) override;
 
+    virtual void drawMeshInstanced(const Mesh* mesh, const std::vector<InstanceData>& instances, bool indirect) override;
+    virtual void setInstancingEnabled(bool enabled) override;
+    virtual void setIndirectDrawEnabled(bool enabled) override;
+    virtual bool isInstancingEnabled() const override { return m_instancingEnabled; }
+    virtual bool isIndirectDrawEnabled() const override { return m_indirectDrawEnabled; }
+    virtual RenderStats getRenderStats() const override;
+    virtual bool loadScene(const std::string& path) override;
+
     virtual void loadAssetIcons() override;
 
     // Callbacks
@@ -223,6 +231,13 @@ private:
     int m_currentFPS = 0;
 
     EntityId m_selectedEntity = -1;
+
+    // Instancing / indirect draw feature switches
+    bool m_instancingEnabled = true;
+    bool m_indirectDrawEnabled = true;
+
+    // Debug/testing hook: console commands from ENGINE_CONSOLE_CMD, one per frame.
+    std::vector<std::string> m_pendingConsoleCommands;
 
     int m_gizmoOperation = 0;
     bool m_gizmoLocalSpace = false;

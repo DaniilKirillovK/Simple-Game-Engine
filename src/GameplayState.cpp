@@ -11,6 +11,7 @@
 #include "InputHandler.h"
 
 #include <filesystem>
+#include <cstdlib>
 #include "Utils/Serialization/SceneSerializer.h"
 #include "Resources/ResourceManager.h"
 #include "MeshFactory.h"
@@ -161,6 +162,12 @@ void GameplayState::exitPlayMode()
 void GameplayState::setupTestScene()
 {
     std::string scenePath = "assets\\scenes\\lava_platformer.json";
+
+    // Test hook: run a different scene without touching the editor defaults.
+    if (const char* overridePath = std::getenv("ENGINE_SCENE"))
+    {
+        scenePath = overridePath;
+    }
 
     if (std::filesystem::exists(scenePath)) 
     {

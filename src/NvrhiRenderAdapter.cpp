@@ -42,6 +42,14 @@
 
 static NvrhiRenderAdapter *g_instance = nullptr;
 
+namespace RenderApi
+{
+    namespace { IRenderAdapter* g_renderAdapter = nullptr; }
+
+    void setAdapter(IRenderAdapter* adapter) { g_renderAdapter = adapter; }
+    IRenderAdapter* getAdapter() { return g_renderAdapter; }
+}
+
 NvrhiRenderAdapter::NvrhiRenderAdapter(bool vulkan, bool verify)
     : gpu(std::make_unique<GpuRenderer>(vulkan, verify)), m_window(nullptr)
       , m_width(DEFAULT_WIDTH)
@@ -51,6 +59,44 @@ NvrhiRenderAdapter::NvrhiRenderAdapter(bool vulkan, bool verify)
 {
     m_autoSaveEnabled = !verify;
     g_instance = this;
+    RenderApi::setAdapter(this);
+
+    // Debug/testing switch: run the per-object path even though instancing is implemented.
+    if (std::getenv("ENGINE_DISABLE_INSTANCING"))
+    {
+        m_instancingEnabled = false;
+        m_indirectDrawEnabled = false;
+        LOG_INFO("NvrhiRenderAdapter: instancing disabled via ENGINE_DISABLE_INSTANCING");
+    }
+    // Debug/testing switch: keep batching but submit plain instanced draws instead of indirect.
+    if (std::getenv("ENGINE_DISABLE_INDIRECT"))
+    {
+        m_indirectDrawEnabled = false;
+        LOG_INFO("NvrhiRenderAdapter: indirect draw disabled via ENGINE_DISABLE_INDIRECT");
+    }
+
+    // Debug/testing hook: run engine-console commands ("a; b; ..."), one per frame.
+    if (const char* commands = std::getenv("ENGINE_CONSOLE_CMD"))
+    {
+        std::string all = commands;
+        size_t start = 0;
+        while (start <= all.size())
+        {
+            size_t end = all.find(';', start);
+            if (end == std::string::npos) end = all.size();
+
+            std::string command = all.substr(start, end - start);
+            const size_t first = command.find_first_not_of(" \t\r\n");
+            if (first != std::string::npos)
+            {
+                const size_t last = command.find_last_not_of(" \t\r\n");
+                m_pendingConsoleCommands.push_back(command.substr(first, last - first + 1));
+            }
+
+            if (end == all.size()) break;
+            start = end + 1;
+        }
+    }
 }
 
 NvrhiRenderAdapter::~NvrhiRenderAdapter()
@@ -112,6 +158,14 @@ void NvrhiRenderAdapter::render(World* world)
     beginImGuiFrame();
     ImGui::DockSpaceOverViewport();
 
+    if (!m_pendingConsoleCommands.empty())
+    {
+        const std::string command = m_pendingConsoleCommands.front();
+        m_pendingConsoleCommands.erase(m_pendingConsoleCommands.begin());
+        LOG_INFO("[console] > " + command);
+        m_scriptConsole.submit(command, m_selectedEntity);
+    }
+
     renderUI();
     
     endImGuiFrame();
@@ -136,6 +190,7 @@ void NvrhiRenderAdapter::shutdown()
 
     gpu.reset();
     g_instance = nullptr;
+    RenderApi::setAdapter(nullptr);
     m_window = nullptr;
 }
 
@@ -169,6 +224,25 @@ void NvrhiRenderAdapter::onKey(int key, int action)
     if (event.pressed && key == GLFW_KEY_F1)
     {
         m_consoleToggleRequested = true;
+        return;
+    }
+
+    if (event.pressed && key == GLFW_KEY_F2)
+    {
+        setInstancingEnabled(!m_instancingEnabled);
+        return;
+    }
+
+    if (event.pressed && key == GLFW_KEY_F4 && m_instancingEnabled)
+    {
+        setIndirectDrawEnabled(!m_indirectDrawEnabled);
+        return;
+    }
+
+    if (event.pressed && key == GLFW_KEY_F5 && !m_isPlaying)
+    {
+        m_currentScenePath = "assets\\scenes\\instancing_demo.json";
+        loadLastScene();
         return;
     }
 
@@ -413,6 +487,62 @@ void NvrhiRenderAdapter::drawMesh(const Mesh *mesh)
             currentNormalMatrix
         );
     }
+}
+
+void NvrhiRenderAdapter::drawMeshInstanced(const Mesh* mesh, const std::vector<InstanceData>& instances, bool indirect)
+{
+    if (!mesh || !mesh->ready || instances.empty() || !m_shaderProgram || !currentMaterial)
+        return;
+
+    gpu->drawMeshInstanced(
+        *mesh,
+        *m_shaderProgram,
+        *currentMaterial,
+        currentLights,
+        currentViewMatrix,
+        currentProjectionMatrix,
+        instances,
+        indirect
+    );
+}
+
+void NvrhiRenderAdapter::setInstancingEnabled(bool enabled)
+{
+    if (m_instancingEnabled == enabled) return;
+    m_instancingEnabled = enabled;
+    LOG_INFO(std::string("Instancing ") + (enabled ? "enabled" : "disabled"));
+}
+
+void NvrhiRenderAdapter::setIndirectDrawEnabled(bool enabled)
+{
+    if (m_indirectDrawEnabled == enabled) return;
+    m_indirectDrawEnabled = enabled;
+    LOG_INFO(std::string("Indirect draw ") + (enabled ? "enabled" : "disabled"));
+}
+
+RenderStats NvrhiRenderAdapter::getRenderStats() const
+{
+    return gpu->stats();
+}
+
+bool NvrhiRenderAdapter::loadScene(const std::string& path)
+{
+    if (!m_world)
+    {
+        LOG_ERROR("loadScene: no active world");
+        return false;
+    }
+    if (!std::filesystem::exists(path))
+    {
+        LOG_ERROR("loadScene: file not found: " + path);
+        return false;
+    }
+
+    m_currentScenePath = path;
+    m_selectedEntity = INVALID_ENTITY;
+    const bool loaded = SceneSerializer::loadScene(*this, *m_world, path);
+    LOG_INFO(std::string("loadScene: ") + (loaded ? "ok " : "failed ") + path);
+    return loaded;
 }
 
 void NvrhiRenderAdapter::loadAssetIcons()
@@ -1482,6 +1612,22 @@ void NvrhiRenderAdapter::renderStatistics()
     }
 
     ImGui::Separator();
+    {
+        RenderStats stats = gpu->stats();
+        ImGui::Text("Draw calls: regular %u | instanced %u | indirect %u",
+            stats.regularDraws, stats.instancedDraws, stats.indirectDraws);
+        ImGui::Text("Instanced batches: %u | instances submitted: %u",
+            stats.batches, stats.batchedInstances);
+        uint32_t instancedCalls = stats.instancedDraws + stats.indirectDraws;
+        uint32_t saved = stats.batchedInstances > instancedCalls
+            ? stats.batchedInstances - instancedCalls : 0;
+        ImGui::Text("Draw calls saved by batching: %u", saved);
+        ImGui::Text("Instancing: %s | Indirect: %s",
+            m_instancingEnabled ? "ON" : "OFF",
+            m_indirectDrawEnabled ? "ON" : "OFF");
+    }
+
+    ImGui::Separator();
 
     ImGui::Text("FPS History:");
     ImGui::PlotLines("##FPS", fpsHistory, 100, fpsIndex, nullptr, 0.0f, 120.0f, ImVec2(0, 60));
@@ -1559,6 +1705,28 @@ void NvrhiRenderAdapter::renderMainMenuBar()
             if (ImGui::MenuItem("Sphere"))
             {
                 if (m_onCreateSphereCallback) m_onCreateSphereCallback();
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Render"))
+        {
+            if (ImGui::MenuItem("Load Instancing Demo Scene", "F5", false, !m_isPlaying))
+            {
+                m_currentScenePath = "assets\\scenes\\instancing_demo.json";
+                loadLastScene();
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Instancing (batch + instance buffer)", "F2", &m_instancingEnabled))
+            {
+                LOG_INFO(std::string("Instancing ") + (m_instancingEnabled ? "enabled" : "disabled"));
+            }
+            if (ImGui::MenuItem("Indirect Draw", "F4", &m_indirectDrawEnabled, m_instancingEnabled))
+            {
+                LOG_INFO(std::string("Indirect draw ") + (m_indirectDrawEnabled ? "enabled" : "disabled"));
             }
 
             ImGui::EndMenu();

@@ -71,7 +71,7 @@ struct DrawConstants
 {
     glm::mat4 model, viewProjection, normal;
     glm::vec4 diffuse, specularShininess, eye;
-    uint32_t lightCount, textured, padding[2];
+    uint32_t lightCount, textured, instanced, padding;
     std::array<LightData, 8> lights;
 };
 
@@ -116,7 +116,8 @@ struct GpuRenderer::State
     rhi::TextureHandle depth;
 
     std::unordered_map<uint32_t, rhi::TextureHandle> textures;
-    std::map<std::pair<uint32_t, bool>, rhi::BindingSetHandle> bindings;
+    using BindingKey = std::tuple<uint32_t, bool, rhi::IBuffer*>;
+    std::map<BindingKey, rhi::BindingSetHandle> bindings;
     std::unordered_map<uint32_t, rhi::ShaderHandle> shaders;
 
     rhi::IFramebuffer* guiTarget = nullptr;
@@ -127,6 +128,12 @@ struct GpuRenderer::State
     rhi::BufferHandle guiVertices;
     rhi::BufferHandle guiIndices;
     rhi::BufferHandle lineVertices;
+    rhi::BufferHandle instanceIdentity; // 1-instance identity data, bound when a shader reads no instances
+    std::vector<rhi::BufferHandle> instanceBuffers; // one structured buffer per batch in a frame
+    size_t instanceBufferCursor = 0;                // resets every frame
+    rhi::BufferHandle indirectArgs;     // growable indirect draw-arguments buffer
+
+    RenderStats statsCounters;
 
     ComPtr<IDxcUtils> utils;
     ComPtr<IDxcCompiler3> compiler;
@@ -216,18 +223,65 @@ struct GpuRenderer::State
         commands->writeBuffer(storage, data, size);
     }
 
-    rhi::IBindingSet* binding(uint32_t texture, bool repeat)
+    // Uploads per-instance transforms into a structured buffer (stride 64: one float4x4).
+    // Each batch in a frame gets its own buffer from the pool: nvrhi's D3D12 backend must not
+    // see two writeBuffer + draw cycles on the same buffer within one command list.
+    rhi::IBuffer* instances(const std::vector<InstanceData>& data)
     {
-        auto it = bindings.find({texture, repeat});
+        const size_t bytes = data.size() * sizeof(InstanceData);
+        if (instanceBufferCursor >= instanceBuffers.size())
+        {
+            auto desc = rhi::BufferDesc().setByteSize(bytes).setStructStride(64)
+                .enableAutomaticStateTracking(rhi::ResourceStates::ShaderResource);
+            auto buffer = device->createBuffer(desc);
+            if (!buffer) 
+                throw std::runtime_error("Cannot allocate instance buffer");
+            instanceBuffers.push_back(buffer);
+        }
+        else if (instanceBuffers[instanceBufferCursor]->getDesc().byteSize < bytes)
+        {
+            auto desc = rhi::BufferDesc().setByteSize(bytes).setStructStride(64)
+                .enableAutomaticStateTracking(rhi::ResourceStates::ShaderResource);
+            auto buffer = device->createBuffer(desc);
+            if (!buffer) 
+                throw std::runtime_error("Cannot allocate instance buffer");
+            instanceBuffers[instanceBufferCursor] = buffer;
+        }
+
+        rhi::IBuffer* buffer = instanceBuffers[instanceBufferCursor++].Get();
+        commands->writeBuffer(buffer, data.data(), bytes);
+        return buffer;
+    }
+
+    // Uploads indirect draw arguments into a growable indirect-arguments buffer.
+    rhi::IBuffer* indirect(const void* args, size_t bytes)
+    {
+        if (!indirectArgs || indirectArgs->getDesc().byteSize < bytes)
+        {
+            auto desc = rhi::BufferDesc().setByteSize(std::max<size_t>(bytes, 256)).setIsDrawIndirectArgs(true)
+                .enableAutomaticStateTracking(rhi::ResourceStates::IndirectArgument);
+            indirectArgs = device->createBuffer(desc);
+            if (!indirectArgs) 
+                throw std::runtime_error("Cannot allocate indirect args buffer");
+        }
+        commands->writeBuffer(indirectArgs, args, bytes);
+        return indirectArgs;
+    }
+
+    rhi::IBindingSet* binding(uint32_t texture, bool repeat, rhi::IBuffer* instanceData)
+    {
+        BindingKey key{ texture, repeat, instanceData };
+        auto it = bindings.find(key);
         if (it != bindings.end()) return it->second;
         auto desc = rhi::BindingSetDesc()
             .addItem(rhi::BindingSetItem::ConstantBuffer(0, constants))
             .addItem(rhi::BindingSetItem::Texture_SRV(0, textures.at(texture)))
+            .addItem(rhi::BindingSetItem::StructuredBuffer_SRV(1, instanceData))
             .addItem(rhi::BindingSetItem::Sampler(0, repeat ? wrapSampler : sampler));
-        return bindings[{texture, repeat}] = device->createBindingSet(desc, layout);
+        return bindings[key] = device->createBindingSet(desc, layout);
     }
 
-    rhi::GraphicsState graphics(Pass pass, ShaderProgram program, uint32_t texture)
+    rhi::GraphicsState graphics(Pass pass, ShaderProgram program, uint32_t texture, rhi::IBuffer* instanceData)
     {
         auto* fb = pass == Pass::Gui ? guiTarget : scene.Get();
         auto& pipeline = pipelines[{pass, program.vertex, program.pixel, fb->getFramebufferInfo().colorFormats[0]}];
@@ -264,10 +318,62 @@ struct GpuRenderer::State
         rhi::GraphicsState result{};
         result.framebuffer = fb;
         result.pipeline = pipeline;
-        result.bindings = {binding(texture, pass == Pass::Scene)};
+        result.bindings = {binding(texture, pass == Pass::Scene, instanceData)};
         result.viewport.addViewportAndScissorRect(fb->getFramebufferInfo().getViewport());
 
         return result;
+    }
+
+    MeshBuffers& ensureMesh(const Mesh& mesh)
+    {
+        auto& buffers = meshes[&mesh];
+        if (!buffers.vertices)
+        {
+            std::vector<SceneInput> vertices(mesh.vertices.size());
+            for (size_t i = 0; i < vertices.size(); ++i)
+            {
+                vertices[i] = { 
+                    mesh.vertices[i],
+                    i < mesh.normals.size() ? mesh.normals[i] : glm::vec3(0,1,0),
+                    i < mesh.texCoords.size() ? mesh.texCoords[i] : glm::vec2(0) 
+                };
+            }
+
+            buffers.vertices = buffer(vertices.data(), vertices.size()*sizeof(SceneInput), false);
+            if (!mesh.indices.empty())
+            {
+                buffers.indices = buffer(mesh.indices.data(), mesh.indices.size() * sizeof(uint32_t), true);
+            }
+
+            mesh.buffersUploaded = true;
+        }
+        return buffers;
+    }
+
+    void fillConstants(DrawConstants& data, const Material& material, const std::vector<Light*>& lights,
+        const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection,
+        const glm::mat4& normal, bool instanced)
+    {
+        data.model = model;
+        data.normal = normal;
+        data.viewProjection = clipTransform() * projection * view;
+        data.eye = glm::inverse(view)[3];
+        data.diffuse = material.diffuseColor;
+        data.specularShininess = glm::vec4(material.specularColor);
+        data.specularShininess.w = material.shininess;
+        data.lightCount = uint32_t(std::min(lights.size(), data.lights.size()));
+        data.instanced = instanced ? 1 : 0;
+
+        for (uint32_t i = 0; i < data.lightCount; ++i)
+        {
+            const Light& l = *lights[i];
+            data.lights[i] = {
+                glm::vec4(l.color,l.intensity), 
+                glm::vec4(glm::vec3(l.position),int(l.type)),
+                glm::vec4(l.direction,l.cutOff), 
+                glm::vec4(l.constant,l.linear,l.quadratic,l.outerCutOff)
+            };
+        }
     }
 };
 
@@ -363,13 +469,35 @@ GLFWwindow* GpuRenderer::initialize(int width, int height)
     s.commands = s.device->createCommandList();
     s.layout = s.device->createBindingLayout(rhi::BindingLayoutDesc().setVisibility(rhi::ShaderType::All)
         .addItem(rhi::BindingLayoutItem::VolatileConstantBuffer(0))
-        .addItem(rhi::BindingLayoutItem::Texture_SRV(0)).addItem(rhi::BindingLayoutItem::Sampler(0)));
+        .addItem(rhi::BindingLayoutItem::Texture_SRV(0))
+        .addItem(rhi::BindingLayoutItem::StructuredBuffer_SRV(1))
+        .addItem(rhi::BindingLayoutItem::Sampler(0)));
     s.constants = s.device->createBuffer(rhi::BufferDesc().setByteSize(sizeof(DrawConstants))
         .setIsConstantBuffer(true).setIsVolatile(true).setMaxVersions(4096));
     s.sampler = s.device->createSampler(rhi::SamplerDesc().setAllFilters(true));
     s.wrapSampler = s.device->createSampler(rhi::SamplerDesc().setAllFilters(true).setAllAddressModes(rhi::SamplerAddressMode::Repeat));
     uint32_t white = 0xffffffff;
     s.white = s.upload(&white, 1, 1);
+
+    // Identity instance data, bound for every non-instanced draw so that the
+    // binding set always covers slot 1 of the binding layout.
+    {
+        s.instanceIdentity = s.device->createBuffer(rhi::BufferDesc().setByteSize(sizeof(InstanceData)).setStructStride(64)
+            .enableAutomaticStateTracking(rhi::ResourceStates::ShaderResource));
+        if (!s.instanceIdentity)
+        {
+            return nullptr;
+        }
+        const float identity[2][16] = {
+            { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
+            { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
+        };
+        auto uploadList = s.device->createCommandList(rhi::CommandListParameters().setEnableImmediateExecution(false));
+        uploadList->open();
+        uploadList->writeBuffer(s.instanceIdentity, identity, sizeof(identity));
+        uploadList->close();
+        s.device->executeCommandList(uploadList);
+    }
     s.overlay.vertex = compileShader(readShader("Shaders/Overlay.vert"), ShaderType::Vertex);
     s.overlay.pixel = compileShader(readShader("Shaders/Overlay.frag"), ShaderType::Fragment);
 
@@ -445,7 +573,11 @@ void GpuRenderer::resizeScene(int width, int height)
     s.depth = s.device->createTexture(desc.setFormat(rhi::Format::D32)
         .enableAutomaticStateTracking(rhi::ResourceStates::DepthWrite));
     s.scene = s.device->createFramebuffer(rhi::FramebufferDesc().addColorAttachment(s.color).setDepthAttachment(s.depth));
-    s.bindings.erase({State::sceneId, false});
+    for (auto it = s.bindings.begin(); it != s.bindings.end();)
+    {
+        if (std::get<0>(it->first) == State::sceneId) it = s.bindings.erase(it);
+        else ++it;
+    }
     s.textures[State::sceneId] = s.color;
 }
 
@@ -461,6 +593,8 @@ void GpuRenderer::run(const std::function<void()>& frame)
 
     s.manager->m_callbacks.beforeRender = [&](DeviceManager&, uint32_t) {
         s.commands->open();
+        s.statsCounters = {};
+        s.instanceBufferCursor = 0;
         s.commands->clearTextureFloat(s.color, rhi::AllSubresources, rhi::Color(0.1f, 0.1f, 0.15f, 1));
         s.commands->clearDepthStencilTexture(s.depth, rhi::AllSubresources, true, 1.f, false, 0);
 
@@ -514,6 +648,11 @@ void GpuRenderer::run(const std::function<void()>& frame)
                 throw std::runtime_error("Scene verification failed (see engine.log)");
 
             LOG_INFO("Verified GPU scene with " + std::to_string(visible) + " varying pixels");
+            LOG_INFO("Draw stats: regular=" + std::to_string(s.statsCounters.regularDraws)
+                + " instanced=" + std::to_string(s.statsCounters.instancedDraws)
+                + " indirect=" + std::to_string(s.statsCounters.indirectDraws)
+                + " batches=" + std::to_string(s.statsCounters.batches)
+                + " instances=" + std::to_string(s.statsCounters.batchedInstances));
             if (s.presentedEditorWindow)
             {
                 LOG_INFO("Verified detached editor window presentation");
@@ -554,8 +693,11 @@ uint32_t GpuRenderer::uploadTexture(const TextureData& data)
 }
 void GpuRenderer::destroyTexture(uint32_t id)
 {
-    state->bindings.erase({id,true}); 
-    state->bindings.erase({id,false});
+    for (auto it = state->bindings.begin(); it != state->bindings.end();)
+    {
+        if (std::get<0>(it->first) == id) it = state->bindings.erase(it);
+        else ++it;
+    }
     state->textures.erase(id); 
 
 }
@@ -571,54 +713,16 @@ void GpuRenderer::drawMesh(const Mesh& mesh, const ShaderProgram& program, const
     if (mesh.vertices.empty() || !program.vertex || !program.pixel) return;
 
     auto& s = *state;
-    auto& buffers = s.meshes[&mesh];
-    if (!buffers.vertices)
-    {
-        std::vector<SceneInput> vertices(mesh.vertices.size());
-        for (size_t i = 0; i < vertices.size(); ++i)
-        {
-            vertices[i] = { 
-                mesh.vertices[i],
-                i < mesh.normals.size() ? mesh.normals[i] : glm::vec3(0,1,0),
-                i < mesh.texCoords.size() ? mesh.texCoords[i] : glm::vec2(0) 
-            };
-        }
-
-        buffers.vertices = s.buffer(vertices.data(), vertices.size()*sizeof(SceneInput), false);
-        if (!mesh.indices.empty())
-        {
-            buffers.indices = s.buffer(mesh.indices.data(), mesh.indices.size() * sizeof(uint32_t), true);
-        }
-
-        mesh.buffersUploaded = true;
-    }
+    auto& buffers = s.ensureMesh(mesh);
 
     DrawConstants data{};
-    data.model = model;
-    data.normal = normal;
-    data.viewProjection = clipTransform() * projection * view;
-    data.eye = glm::inverse(view)[3];
-    data.diffuse = material.diffuseColor;
-    data.specularShininess = glm::vec4(material.specularColor);
-    data.specularShininess.w = material.shininess;
-    data.lightCount = uint32_t(std::min(lights.size(), data.lights.size()));
-
-    for (uint32_t i = 0; i < data.lightCount; ++i)
-    {
-        const Light& l = *lights[i];
-        data.lights[i] = {
-            glm::vec4(l.color,l.intensity), 
-            glm::vec4(glm::vec3(l.position),int(l.type)),
-            glm::vec4(l.direction,l.cutOff), 
-            glm::vec4(l.constant,l.linear,l.quadratic,l.outerCutOff)
-        };
-    }
+    s.fillConstants(data, material, lights, model, view, projection, normal, false);
 
     uint32_t texture = material.diffuseTexture ? material.diffuseTexture->m_handle : 0;
     data.textured = material.hasTexture && s.textures.count(texture);
     s.commands->writeBuffer(s.constants, &data, sizeof(data));
 
-    auto graphics = s.graphics(Pass::Scene, program, data.textured ? texture : s.white);
+    auto graphics = s.graphics(Pass::Scene, program, data.textured ? texture : s.white, s.instanceIdentity);
     graphics.addVertexBuffer(rhi::VertexBufferBinding().setBuffer(buffers.vertices));
 
     if (buffers.indices)
@@ -632,6 +736,80 @@ void GpuRenderer::drawMesh(const Mesh& mesh, const ShaderProgram& program, const
         s.commands->drawIndexed(rhi::DrawArguments().setVertexCount(uint32_t(mesh.indices.size())));
     }
     else s.commands->draw(rhi::DrawArguments().setVertexCount(uint32_t(mesh.vertices.size())));
+
+    s.statsCounters.regularDraws++;
+}
+
+void GpuRenderer::drawMeshInstanced(const Mesh& mesh, const ShaderProgram& program, const Material& material,
+    const std::vector<Light*>& lights, const glm::mat4& view, const glm::mat4& projection,
+    const std::vector<InstanceData>& instances, bool indirect)
+{
+    if (mesh.vertices.empty() || !program.vertex || !program.pixel || instances.empty()) return;
+
+    auto& s = *state;
+    auto& buffers = s.ensureMesh(mesh);
+
+    DrawConstants data{};
+    s.fillConstants(data, material, lights, glm::mat4(1.0f), view, projection, glm::mat4(1.0f), true);
+
+    uint32_t texture = material.diffuseTexture ? material.diffuseTexture->m_handle : 0;
+    data.textured = material.hasTexture && s.textures.count(texture);
+    s.commands->writeBuffer(s.constants, &data, sizeof(data));
+
+    rhi::IBuffer* instanceData = s.instances(instances);
+    auto graphics = s.graphics(Pass::Scene, program, data.textured ? texture : s.white, instanceData);
+    graphics.addVertexBuffer(rhi::VertexBufferBinding().setBuffer(buffers.vertices));
+
+    if (buffers.indices)
+    {
+        graphics.indexBuffer.setOffset(0).setBuffer(buffers.indices).setFormat(rhi::Format::R32_UINT);
+    }
+
+    if (indirect)
+    {
+        if (buffers.indices)
+        {
+            nvrhi::DrawIndexedIndirectArguments args{};
+            args.indexCount = uint32_t(mesh.indices.size());
+            args.instanceCount = uint32_t(instances.size());
+            graphics.setIndirectParams(s.indirect(&args, sizeof(args)));
+            s.commands->setGraphicsState(graphics);
+            s.commands->drawIndexedIndirect(0, 1);
+        }
+        else
+        {
+            nvrhi::DrawIndirectArguments args{};
+            args.vertexCount = uint32_t(mesh.vertices.size());
+            args.instanceCount = uint32_t(instances.size());
+            graphics.setIndirectParams(s.indirect(&args, sizeof(args)));
+            s.commands->setGraphicsState(graphics);
+            s.commands->drawIndirect(0, 1);
+        }
+        s.statsCounters.indirectDraws++;
+    }
+    else
+    {
+        s.commands->setGraphicsState(graphics);
+        if (buffers.indices)
+        {
+            s.commands->drawIndexed(rhi::DrawArguments().setVertexCount(uint32_t(mesh.indices.size()))
+                .setInstanceCount(uint32_t(instances.size())));
+        }
+        else
+        {
+            s.commands->draw(rhi::DrawArguments().setVertexCount(uint32_t(mesh.vertices.size()))
+                .setInstanceCount(uint32_t(instances.size())));
+        }
+        s.statsCounters.instancedDraws++;
+    }
+
+    s.statsCounters.batchedInstances += uint32_t(instances.size());
+    s.statsCounters.batches++;
+}
+
+RenderStats GpuRenderer::stats() const
+{
+    return state->statsCounters;
 }
 
 void GpuRenderer::drawLines(const std::vector<DebugVertex>& lines, const glm::mat4& view, const glm::mat4& projection)
@@ -650,7 +828,7 @@ void GpuRenderer::drawLines(const std::vector<DebugVertex>& lines, const glm::ma
     s.stream(s.lineVertices, vertices.data(), vertices.size()*sizeof(OverlayInput), false);
     auto matrix = clipTransform() * projection * view;
     s.commands->writeBuffer(s.constants, &matrix, sizeof(matrix));
-    auto graphics = s.graphics(Pass::Lines, s.overlay, s.white);
+    auto graphics = s.graphics(Pass::Lines, s.overlay, s.white, s.instanceIdentity);
     graphics.addVertexBuffer(rhi::VertexBufferBinding().setBuffer(s.lineVertices));
     s.commands->setGraphicsState(graphics);
     s.commands->draw(rhi::DrawArguments().setVertexCount(uint32_t(vertices.size())));
@@ -760,7 +938,7 @@ void GpuRenderer::drawGui(const ImDrawData& data)
             auto tex = uint32_t(uintptr_t(cmd.TextureId));
             if (!s.textures.count(tex)) continue;
 
-            auto graphics = s.graphics(Pass::Gui, s.overlay, tex);
+            auto graphics = s.graphics(Pass::Gui, s.overlay, tex, s.instanceIdentity);
 
             auto& rect = graphics.viewport.scissorRects[0];
             rect.minX = std::max(0, int((cmd.ClipRect.x - data.DisplayPos.x)*data.FramebufferScale.x));

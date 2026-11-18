@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <vector>
 #include <glm/glm.hpp>
 #include "InputHandler.h"
 #include "Resources/ShaderLoader/ShaderProgram.h"
@@ -22,6 +23,24 @@ struct Color
     Color(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0, uint8_t a = 255)
         : r(r), g(g), b(b), a(a) {
     }
+};
+
+// Per-instance data for the instanced / indirect path.
+// Layout matches 2 x float4x4 in the shader: model matrix + normal matrix.
+struct InstanceData
+{
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 normal = glm::mat4(1.0f);
+};
+
+// Draw statistics of the last rendered frame, for the instancing demo.
+struct RenderStats
+{
+    uint32_t regularDraws = 0;     // per-object draw calls (non-instanced)
+    uint32_t instancedDraws = 0;   // instanced draw calls (direct)
+    uint32_t indirectDraws = 0;    // instanced draws issued via an indirect args buffer
+    uint32_t batchedInstances = 0; // instances submitted through the batched path
+    uint32_t batches = 0;          // number of instanced batches flushed
 };
 
 
@@ -76,6 +95,22 @@ public:
 
     virtual void drawMesh(const Mesh* mesh) = 0;
 
+    // Draws one mesh with many transforms in a single draw call.
+    // When 'indirect' is true the draw arguments (index/vertex count, instance count)
+    // are written to a GPU indirect-arguments buffer and submitted via drawIndexedIndirect /
+    // drawIndirect; otherwise a plain instanced draw is used.
+    virtual void drawMeshInstanced(const Mesh* mesh, const std::vector<InstanceData>& instances, bool indirect) = 0;
+
+    // Instancing feature toggles (renderer submits batched draws only when enabled).
+    virtual void setInstancingEnabled(bool enabled) = 0;
+    virtual void setIndirectDrawEnabled(bool enabled) = 0;
+    virtual bool isInstancingEnabled() const = 0;
+    virtual bool isIndirectDrawEnabled() const = 0;
+    virtual RenderStats getRenderStats() const = 0;
+
+    // Loads a scene file into the live world (used by the editor and the script console).
+    virtual bool loadScene(const std::string& path) = 0;
+
     virtual void loadAssetIcons() = 0;
 
     // Shader compile and linkage
@@ -95,3 +130,11 @@ public:
     // Editor: prefab list, instantiate into the scene, save selection as a template
     virtual void setPrefabLibrary(PrefabLibrary* library) = 0;
 };
+
+// Process-wide access point to the active render adapter, used by the engine
+// console (Python `engine` module) and by debug commands.
+namespace RenderApi
+{
+    void setAdapter(IRenderAdapter* adapter);
+    IRenderAdapter* getAdapter();
+}
