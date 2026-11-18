@@ -26,8 +26,15 @@ public:
 	void shutdown();
 	bool isInitialized() const { return m_initialized; }
 
+	struct BehaviourClass
+	{
+		std::string moduleName;
+		std::string className;
+	};
+
 	pybind11::object loadBehaviourClass(const std::string& moduleName, const std::string& className,
 		bool allowLastGood = false);
+	std::vector<BehaviourClass> listBehaviourClasses() const;
 
 	std::vector<std::string> pollFileChanges(float deltaTime);
 

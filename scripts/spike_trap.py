@@ -32,10 +32,16 @@ class SpikeTrap(engine.Behaviour):
     def on_trigger_enter(self, other):
         if other == self._player_entity:
             self._player_inside = True
+            self._hit_player()
 
     def on_trigger_exit(self, other):
         if other == self._player_entity:
             self._player_inside = False
+
+    def _hit_player(self):
+        if self.extended and self._player_inside and not self._hit_this_cycle and self._player is not None:
+            self._player.take_damage(self.damage, "Impaled on spikes")
+            self._hit_this_cycle = True
 
     def on_update(self, dt):
         cycle = max(0.1, self.rest_time + self.warn_time + self.active_time)
@@ -57,6 +63,4 @@ class SpikeTrap(engine.Behaviour):
 
         self.extended = self._offset > self.extend_height * 0.5
 
-        if self.extended and not self._hit_this_cycle and self._player is not None and self._player_inside:
-            self._player.take_damage(self.damage, "Impaled on spikes")
-            self._hit_this_cycle = True
+        self._hit_player()

@@ -1584,6 +1584,33 @@ void OpenGLRenderAdapter::renderInspector()
                 m_world->getComponentPool<Collider>().addComponent(m_selectedEntity, Collider{});
             }
         }
+
+        // Script
+        if (!m_world->getComponentPool<Script>().hasComponent(m_selectedEntity))
+        {
+            ImGui::BeginDisabled(m_isPlaying);
+            if (ImGui::BeginCombo("Add Script", "Select class..."))
+            {
+                const auto classes = ScriptEngine::getInstance().listBehaviourClasses();
+                if (classes.empty())
+                {
+                    ImGui::TextDisabled("No behaviour classes in scripts/");
+                }
+
+                for (const auto& behaviourClass : classes)
+                {
+                    const std::string label = behaviourClass.moduleName + "." + behaviourClass.className;
+                    if (ImGui::Selectable(label.c_str()))
+                    {
+                        m_world->getComponentPool<Script>().addComponent(m_selectedEntity,
+                            Script(behaviourClass.moduleName, behaviourClass.className));
+                    }
+                }
+
+                ImGui::EndCombo();
+            }
+            ImGui::EndDisabled();
+        }
     }
 
     if (Script* script = m_world->getComponent<Script>(m_selectedEntity))
@@ -1667,6 +1694,10 @@ void OpenGLRenderAdapter::renderInspector()
         if (isPlaying)
         {
             ImGui::TextWrapped("Field changes apply to the running object and are discarded on Stop.");
+        }
+        else if (ImGui::Button("Remove Script"))
+        {
+            m_world->getComponentPool<Script>().removeComponent(m_selectedEntity);
         }
 
         ImGui::PopID();

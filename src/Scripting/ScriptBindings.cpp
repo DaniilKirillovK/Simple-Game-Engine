@@ -252,7 +252,8 @@ std::vector<EntityHandle> overlapBox(const glm::vec3& center, const glm::vec3& h
 }
 
 py::object raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
-	const std::string& name, const py::object& ignore, const std::vector<std::string>& exclude)
+	const std::string& name, const py::object& ignore, const std::vector<std::string>& exclude,
+	bool ignoreTriggers)
 {
 	ZoneScopedN("engine.raycast");
 
@@ -280,6 +281,8 @@ py::object raycast(const glm::vec3& origin, const glm::vec3& direction, float ma
 
 	auto accept = [&](EntityId entity)
 	{
+		const Collider* collider = world.getComponent<Collider>(entity);
+		if (ignoreTriggers && collider && collider->isTrigger) return false;
 		return entity != ignored && !tagExcluded(world, entity, name, exclude);
 	};
 
@@ -619,9 +622,9 @@ PYBIND11_EMBEDDED_MODULE(engine, m)
 
 	m.def("raycast", &raycast, "origin"_a, "direction"_a,
 		"max_distance"_a = std::numeric_limits<float>::max(), "name"_a = "", "ignore"_a = py::none(),
-		"exclude"_a = std::vector<std::string>{},
+		"exclude"_a = std::vector<std::string>{}, "ignore_triggers"_a = false,
 		"Nearest visible mesh hit by the ray or None; name keeps only that tag, ignore skips one entity, "
-		"exclude skips every entity whose tag is in the list");
+		"exclude skips every entity whose tag is in the list, ignore_triggers skips trigger colliders");
 
 	m.def("hud", [](const std::string& key, const std::string& text) { activeSystem().setHudLine(key, text); },
 		"key"_a, "text"_a, "Shows a HUD line over the viewport until Stop; lines are ordered by key");

@@ -160,6 +160,48 @@ py::object ScriptEngine::loadBehaviourClass(const std::string& moduleName, const
 	return entry.module.attr(className.c_str());
 }
 
+std::vector<ScriptEngine::BehaviourClass> ScriptEngine::listBehaviourClasses() const
+{
+	std::vector<BehaviourClass> classes;
+	if (!m_initialized) return classes;
+
+	try
+	{
+		py::object base = py::module_::import("engine").attr("Behaviour");
+
+		for (const auto& [moduleName, entry] : m_modules)
+		{
+			if (!entry.module || entry.failed) continue;
+
+			for (auto item : py::reinterpret_borrow<py::dict>(entry.module.attr("__dict__")))
+			{
+				py::handle value = item.second;
+				if (!PyType_Check(value.ptr()) || value.is(base)) continue;
+
+				py::object owner = value.attr("__module__");
+				if (!py::isinstance<py::str>(owner) || owner.cast<std::string>() != moduleName) continue;
+
+				if (PyObject_IsSubclass(value.ptr(), base.ptr()) == 1)
+				{
+					classes.push_back({ moduleName, item.first.cast<std::string>() });
+				}
+				PyErr_Clear();
+			}
+		}
+	}
+	catch (const std::exception& e)
+	{
+		logPythonError("Failed to list script classes", e);
+	}
+
+	std::sort(classes.begin(), classes.end(), [](const BehaviourClass& a, const BehaviourClass& b)
+		{
+			return a.moduleName != b.moduleName ? a.moduleName < b.moduleName : a.className < b.className;
+		});
+
+	return classes;
+}
+
 std::vector<std::string> ScriptEngine::pollFileChanges(float deltaTime)
 {
 	if (!m_initialized) return {};

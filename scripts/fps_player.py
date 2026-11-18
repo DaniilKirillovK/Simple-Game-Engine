@@ -270,7 +270,7 @@ class FpsPlayer(engine.Behaviour):
                     origin = engine.Vec3(x, y + height, z + offset)
                 else:
                     origin = engine.Vec3(x + offset, y + height, z)
-                hit = engine.raycast(origin, direction, reach, exclude=self._pass_through)
+                hit = engine.raycast(origin, direction, reach, exclude=self._pass_through, ignore_triggers=True)
                 if hit is not None:
                     allowed = min(allowed, max(0.0, hit.distance - self.radius - SKIN))
                     if allowed == 0.0:
@@ -286,7 +286,7 @@ class FpsPlayer(engine.Behaviour):
 
             for offset_x, offset_z in self._probes:
                 origin = engine.Vec3(x + offset_x, y + STEP_HEIGHT, z + offset_z)
-                hit = engine.raycast(origin, self._down, reach, exclude=self._pass_through)
+                hit = engine.raycast(origin, self._down, reach, exclude=self._pass_through, ignore_triggers=True)
                 if hit is not None:
                     distance = hit.distance
                     if best_distance is None or distance < best_distance:
@@ -309,7 +309,7 @@ class FpsPlayer(engine.Behaviour):
 
         for offset_x, offset_z in self._probes:
             origin = engine.Vec3(x + offset_x, y + head, z + offset_z)
-            hit = engine.raycast(origin, self._up, 0.3 + dy, exclude=self._pass_through)
+            hit = engine.raycast(origin, self._up, 0.3 + dy, exclude=self._pass_through, ignore_triggers=True)
             if hit is not None:
                 self._vertical_speed = 0.0
                 return y + max(0.0, hit.distance - 0.3)

@@ -72,7 +72,7 @@ class ShootTarget(engine.Behaviour):
         if angle != self._angle:
             self._angle = angle
             base = self._base_rotation
-            self._entity.rotation = engine.Vec3(base[0], base[1] + angle, base[2])
+            self.entity.rotation = engine.Vec3(base[0], base[1] + angle, base[2])
 
         if self._flash > 0.0:
             self._flash = max(0.0, self._flash - dt * 8.0)
