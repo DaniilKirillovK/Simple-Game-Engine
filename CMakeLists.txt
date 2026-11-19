@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.24)
 project ("GameEngine")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -23,7 +23,7 @@ file(GLOB IMGUI_SOURCES
 set(ASSIMP_LIB_DIR "${ASSIMP_DIR}/lib")
 set(ASSIMP_LIB_NAME "assimp-vc143-mt")
 
-add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} ${IMGUIZMO_DIR} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/NvrhiRenderAdapter.cpp" "src/GpuRenderer.cpp" "src/ViewportSwapChain.cpp" "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp" "src/Utils/HierarchyUtils.cpp" "src/Utils/json.hpp" "src/Systems/TransformSystem.cpp" "src/Utils/Serialization/SceneSerializer.cpp" "src/Utils/Assets/AssetsUtils.cpp" "external/tracy/TracyClient.cpp" "src/JobSystem/JobSystem.cpp" "src/Resources/AssetLoader.cpp" "src/Scripting/ScriptEngine.cpp" "src/Scripting/ScriptBindings.cpp" "src/Scripting/ScriptConsole.cpp" "src/Utils/RayCast.cpp" "src/Utils/EntityBounds.cpp" "src/Systems/TriggerTracker.cpp" "src/Systems/ScriptSystem.cpp" "src/Gameplay/PrefabLibrary.cpp" "src/Scripting/ScriptInspector.h" "src/Scripting/EntityReferenceData.h")
+add_executable(${PROJECT_NAME} ${IMGUI_SOURCES} ${IMGUIZMO_DIR} "GameEngine.cpp" "src/Application.cpp" "src/Logger.cpp" "src/GameplayState.cpp" "src/InputHandler.cpp" "src/NvrhiRenderAdapter.cpp" "src/GpuRenderer.cpp" "src/ViewportSwapChain.cpp" "src/Entity.cpp" "src/Component.cpp" "src/ComponentPool.cpp" "src/World.cpp" "src/RenderTest.cpp" "src/Systems/RenderSystem.cpp" "src/Systems/CameraSystem.cpp" "src/Systems/MovementSystem.cpp" "src/Resources/Resource.cpp" "src/Resources/ResourceManager.cpp" "src/Resources/MeshLoader/MeshLoader.cpp" "src/Resources/ShaderLoader/ShaderLoader.cpp" "src/Resources/TextureLoader/TextureLoader.cpp" "src/Resources/TextureLoader/Texture.cpp" "src/Systems/PhysicsSystem.cpp" "src/Utils/HierarchyUtils.cpp" "src/Utils/json.hpp" "src/Systems/TransformSystem.cpp" "src/Utils/Serialization/SceneSerializer.cpp" "src/Utils/Assets/AssetsUtils.cpp" "external/tracy/TracyClient.cpp" "src/JobSystem/JobSystem.cpp" "src/Resources/AssetLoader.cpp" "src/Scripting/ScriptEngine.cpp" "src/Scripting/ScriptBindings.cpp" "src/Scripting/ScriptConsole.cpp" "src/Utils/RayCast.cpp" "src/Utils/EntityBounds.cpp" "src/Systems/TriggerTracker.cpp" "src/Systems/ScriptSystem.cpp" "src/Gameplay/PrefabLibrary.cpp" "src/Scripting/ScriptInspector.h" "src/Scripting/EntityReferenceData.h")
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE TRACY_ENABLE)
 target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_SCRIPTS_SOURCE_DIR="${CMAKE_SOURCE_DIR}/scripts")
@@ -119,3 +119,11 @@ add_custom_command(TARGET GameEngine POST_BUILD
         "${dxc_SOURCE_DIR}/bin/x64/dxcompiler.dll"
         "${dxc_SOURCE_DIR}/bin/x64/dxil.dll"
         $<TARGET_FILE_DIR:GameEngine>)
+
+# Automated offscreen render test (LR 3 addon): headless, no window, compares the
+# frame with per-API golden images; each test fails with a non-zero exit on mismatch.
+enable_testing()
+add_test(NAME render_test_d3d12 COMMAND GameEngine --render-test d3d12 --golden "${CMAKE_SOURCE_DIR}/tests/render/golden")
+add_test(NAME render_test_vulkan COMMAND GameEngine --render-test vulkan --golden "${CMAKE_SOURCE_DIR}/tests/render/golden")
+set_tests_properties(render_test_d3d12 render_test_vulkan PROPERTIES
+    WORKING_DIRECTORY "$<TARGET_FILE_DIR:GameEngine>")

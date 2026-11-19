@@ -87,9 +87,45 @@ bool NvrhiRenderAdapter::initialize(int width, int height)
     return true;
 }
 
+bool NvrhiRenderAdapter::initializeHeadless(int width, int height)
+{
+    m_width = width;
+    m_height = height;
+    m_headless = true;
+
+    if (!gpu->initializeHeadless(width, height))
+    {
+        return false;
+    }
+
+    m_sceneImageSize = ImVec2(float(width), float(height));
+
+    Mesh::gpuReleaseContext = this;
+    Mesh::gpuReleaseHook = [](void* ctx, Mesh* mesh) {
+        static_cast<NvrhiRenderAdapter*>(ctx)->gpu->releaseMesh(mesh);
+    };
+    return true;
+}
+
+void NvrhiRenderAdapter::runFramesHeadless(const std::function<void()>& frame, uint32_t frameCount)
+{
+    gpu->runHeadless(frame, frameCount);
+}
+
+bool NvrhiRenderAdapter::readSceneToMemory(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height)
+{
+    return gpu->readSceneToMemory(rgb, width, height);
+}
+
 void NvrhiRenderAdapter::render(World* world)
 {
     m_world = world;
+
+    if (m_headless)
+    {
+        // No window, no UI: the world update already submitted the scene.
+        return;
+    }
 
     if (m_stopRequested)
     {
@@ -124,7 +160,7 @@ void NvrhiRenderAdapter::runFrames(const std::function<void()>& frame)
 
 void NvrhiRenderAdapter::shutdown()
 {
-    if (!m_window) return;
+    if (!m_window && !m_headless) return;
 
     if (m_autoSaveEnabled && m_world) saveCurrentScene();
 
@@ -132,11 +168,15 @@ void NvrhiRenderAdapter::shutdown()
     Mesh::gpuReleaseHook = nullptr;
 
     Logger::instance().setLogCallback({});
-    shutdownImGui();
+    if (!m_headless)
+    {
+        shutdownImGui();
+    }
 
     gpu.reset();
     g_instance = nullptr;
     m_window = nullptr;
+    m_headless = false;
 }
 
 void NvrhiRenderAdapter::framebufferSizeCallback(GLFWwindow *window, int width, int height)
