@@ -37,6 +37,7 @@
 #include "Gameplay/PrefabLibrary.h"
 #include "Components/PrefabInstance.h"
 #include "Systems/ScriptSystem.h"
+#include "Systems/RenderSystem.h"
 #include "Scripting/ScriptConsole.h"
 #include <optional>
 
@@ -1483,6 +1484,28 @@ void NvrhiRenderAdapter::renderStatistics()
 
     ImGui::Separator();
 
+    if (m_world)
+    {
+        if (auto* renderSystem = m_world->getSystem<RenderSystem>())
+        {
+            bool enabled = renderSystem->isFrustumCullingEnabled();
+            if (ImGui::Checkbox("CPU frustum culling", &enabled))
+                renderSystem->setFrustumCullingEnabled(enabled);
+            const auto& stats = renderSystem->getStatistics();
+            ImGui::Text("Mesh renderers: %llu", static_cast<unsigned long long>(stats.totalRenderers));
+            ImGui::Text("Candidates: %llu | Bounds tested: %llu",
+                static_cast<unsigned long long>(stats.candidates),
+                static_cast<unsigned long long>(stats.boundsTested));
+            ImGui::Text("Culled: %llu | Submitted: %llu",
+                static_cast<unsigned long long>(stats.culled),
+                static_cast<unsigned long long>(stats.submitted));
+            ImGui::Text("Visibility CPU: %.3f ms | Submission CPU: %.3f ms",
+                stats.visibilityCpuMs, stats.submissionCpuMs);
+            ImGui::TextDisabled("Submissions exclude debug/UI. Toggle takes effect next frame.");
+        }
+    }
+
+    ImGui::Separator();
     ImGui::Text("FPS History:");
     ImGui::PlotLines("##FPS", fpsHistory, 100, fpsIndex, nullptr, 0.0f, 120.0f, ImVec2(0, 60));
 
